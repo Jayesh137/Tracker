@@ -133,20 +133,22 @@ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 - Wallet selector: pill-shaped dropdown
 - Settings gear icon with subtle hover
 
-### 2. Stats Bar (Subtle)
+### 2. Stats Bar (Tasteful)
 
 ```
 ┌───────────┬───────────┬───────────┐
 │  WIN RATE │ AVG GAIN  │  STREAK   │
-│    72%    │  +$342    │  5 wins   │
+│    72%    │  +$342    │   5 🔥    │
+│   ●●●●○   │  green    │           │
 └───────────┴───────────┴───────────┘
 ```
 
-- Three equal columns
-- Simple numbers, no decorations
-- Color-coded values (green/red for PnL)
+- Three equal columns with subtle dividers
+- Win rate: percentage with minimal dot indicator (filled/empty)
+- Avg gain: color-coded (green/red), clean number
+- Streak: number with small flame icon when 3+, nothing when < 3
 - Muted labels, prominent values
-- Subtle dividers between stats
+- Overall: informative at a glance, not shouty
 
 ### 3. Position Card
 
@@ -260,6 +262,29 @@ transition: all 150ms ease-out;
 }
 ```
 
+### Trade Item Feedback
+
+```css
+/* Subtle left border accent for new trades */
+.trade-item.profit {
+  border-left: 3px solid var(--profit);
+}
+
+.trade-item.loss {
+  border-left: 3px solid var(--loss);
+}
+
+/* Brief highlight on PnL update */
+@keyframes pnlHighlight {
+  0% { background-color: rgba(74, 222, 128, 0.2); }
+  100% { background-color: transparent; }
+}
+
+.pnl-new {
+  animation: pnlHighlight 400ms ease-out;
+}
+```
+
 ### Loading States
 
 ```css
@@ -283,19 +308,19 @@ transition: all 150ms ease-out;
 
 ---
 
-## Gamification Details (Subtle)
+## Gamification Details (Tasteful)
 
-The gamification is **data-focused, not flashy**. Stats are displayed cleanly without attention-grabbing animations or celebrations.
+The gamification is **polished but restrained**. Satisfying visual feedback without being distracting or gimmicky.
 
-### Win Rate Calculation
+### Win Rate
 
 ```
 win_rate = (profitable_closes / total_closes) * 100
 ```
 
-- Displayed as simple percentage
-- Color-coded text only: green >= 50%, muted gray < 50%
-- No progress bars or visual flourishes
+- Percentage with minimal dot indicator (●●●●○ style, 5 dots)
+- Green tint when >= 60%, neutral otherwise
+- Clean, glanceable
 
 ### Average Gain
 
@@ -303,24 +328,35 @@ win_rate = (profitable_closes / total_closes) * 100
 avg_gain = total_pnl / total_closes
 ```
 
-- Simple number with +/- prefix
-- Color matches profit/loss
-- No trend arrows or comparisons
+- Clean number with +/- prefix
+- Color-coded: green for positive, red for negative
+- Subtle background tint matching the value
 
 ### Win Streak
 
-- Simple counter: "5 wins"
-- No emojis, no fire
-- Just the number, muted styling
-- Resets to 0 on loss
+- Shows number when >= 1
+- Small 🔥 icon appears at 3+ streak (tasteful, not spammy)
+- Resets on loss
+- No fanfare, just appears/disappears naturally
 
-### No Celebrations
+### Visual Feedback on Wins
 
-- No overlays
-- No confetti
-- No glow effects
-- No sounds
-- Just the data, cleanly presented
+When a profitable trade closes:
+- The trade item in the feed has a subtle green left border
+- PnL number briefly highlights (200ms fade)
+- No overlays, no blocking animations
+
+When a losing trade closes:
+- Subtle red left border on trade item
+- Same brief highlight treatment
+
+### What We Don't Do
+
+- No confetti or particle effects
+- No sound effects
+- No full-screen overlays
+- No bouncing or attention-grabbing animations
+- No achievement unlocks or badges
 
 ---
 
