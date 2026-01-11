@@ -133,20 +133,19 @@ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 - Wallet selector: pill-shaped dropdown
 - Settings gear icon with subtle hover
 
-### 2. Stats Bar (Gamification)
+### 2. Stats Bar (Subtle)
 
 ```
 ┌───────────┬───────────┬───────────┐
 │  WIN RATE │ AVG GAIN  │  STREAK   │
-│    72%    │  +$342    │   🔥 5    │
-│  ████░░   │   ▲ 12%   │  wins     │
+│    72%    │  +$342    │  5 wins   │
 └───────────┴───────────┴───────────┘
 ```
 
 - Three equal columns
-- Win rate with mini progress bar
-- Avg gain with trend arrow
-- Streak with fire emoji when active
+- Simple numbers, no decorations
+- Color-coded values (green/red for PnL)
+- Muted labels, prominent values
 - Subtle dividers between stats
 
 ### 3. Position Card
@@ -189,28 +188,7 @@ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 - Timestamp right-aligned, muted
 - PnL shown for closes, color-coded
 
-### 5. Celebration Overlay (for profitable closes)
-
-```
-┌─────────────────────────────────────┐
-│                                     │
-│           ✨ WINNER ✨              │
-│                                     │
-│            +$1,240                  │
-│          BTC SHORT                  │
-│                                     │
-│     ─────────────────────          │
-│     72% win rate • 🔥 6 streak     │
-│                                     │
-└─────────────────────────────────────┘
-```
-
-- Appears briefly (2s) on profitable close > $100
-- Subtle glow effect, not distracting
-- Shows updated streak if applicable
-- Auto-dismisses, tap to dismiss early
-
-### 6. Add Wallet Modal
+### 5. Add Wallet Modal
 
 ```
 ┌─────────────────────────────────────┐
@@ -282,21 +260,6 @@ transition: all 150ms ease-out;
 }
 ```
 
-### Win Celebration
-
-```css
-/* Brief glow effect for wins */
-@keyframes celebrateGlow {
-  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
-  50% { box-shadow: 0 0 20px 10px rgba(74, 222, 128, 0.2); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
-}
-
-.position-card.win {
-  animation: celebrateGlow 600ms ease-out;
-}
-```
-
 ### Loading States
 
 ```css
@@ -320,7 +283,9 @@ transition: all 150ms ease-out;
 
 ---
 
-## Gamification Details
+## Gamification Details (Subtle)
+
+The gamification is **data-focused, not flashy**. Stats are displayed cleanly without attention-grabbing animations or celebrations.
 
 ### Win Rate Calculation
 
@@ -328,8 +293,9 @@ transition: all 150ms ease-out;
 win_rate = (profitable_closes / total_closes) * 100
 ```
 
-- Displayed as percentage with progress bar
-- Green if >= 50%, yellow if 40-50%, red if < 40%
+- Displayed as simple percentage
+- Color-coded text only: green >= 50%, muted gray < 50%
+- No progress bars or visual flourishes
 
 ### Average Gain
 
@@ -337,24 +303,24 @@ win_rate = (profitable_closes / total_closes) * 100
 avg_gain = total_pnl / total_closes
 ```
 
-- Shows trend arrow (▲/▼) comparing to last 7 days
-- Always show +/- prefix
+- Simple number with +/- prefix
+- Color matches profit/loss
+- No trend arrows or comparisons
 
 ### Win Streak
 
-- Counter of consecutive profitable trades
-- Fire emoji 🔥 appears at 3+ streak
+- Simple counter: "5 wins"
+- No emojis, no fire
+- Just the number, muted styling
 - Resets to 0 on loss
-- Max recorded streak shown in settings
 
-### Celebration Triggers
+### No Celebrations
 
-| Condition | Animation |
-|-----------|-----------|
-| Close with profit > $100 | Card glow + mini celebration |
-| Close with profit > $1000 | Full celebration overlay |
-| New streak record | Streak badge pulse |
-| Win rate crosses 70% | Stats bar highlight |
+- No overlays
+- No confetti
+- No glow effects
+- No sounds
+- Just the data, cleanly presented
 
 ---
 
