@@ -98,3 +98,15 @@ export interface Store {
     notificationsEnabled: boolean;
   };
 }
+
+export interface IStorage {
+  load(): Promise<void>;
+  getWallets(): Wallet[];
+  addWallet(address: string, name: string): Promise<void>;
+  removeWallet(address: string): Promise<void>;
+  updateWalletName(address: string, name: string): Promise<void>;
+  getPushSubscriptions(): PushSubscription[];
+  addPushSubscription(subscription: PushSubscription): Promise<void>;
+  removePushSubscription(endpoint: string): Promise<void>;
+  getSettings(): { notificationsEnabled: boolean };
+}

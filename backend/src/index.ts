@@ -5,12 +5,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { Storage } from './storage/store.js';
+import { RedisStorage } from './storage/redis-store.js';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
 import { formatTradeNotification } from './notifications/formatter.js';
 import { createRoutes } from './routes.js';
-import type { HyperliquidFill } from './types/index.js';
+import type { HyperliquidFill, IStorage } from './types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,8 +20,17 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function main() {
-  // Initialize storage
-  const storage = new Storage('./data/store.json');
+  // Initialize storage - use Redis if configured, otherwise file storage
+  let storage: IStorage;
+
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    console.log('[Storage] Using Redis storage');
+    storage = new RedisStorage();
+  } else {
+    console.log('[Storage] Using file storage (data may not persist on Render)');
+    storage = new Storage('./data/store.json');
+  }
+
   await storage.load();
   console.log(`[Storage] Loaded ${storage.getWallets().length} wallets`);
 

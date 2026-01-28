@@ -1,11 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { Storage } from './storage/store.js';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
-import type { PushSubscription } from './types/index.js';
+import type { PushSubscription, IStorage } from './types/index.js';
 
 export function createRoutes(
-  storage: Storage,
+  storage: IStorage,
   hlClient: HyperliquidClient,
   hlWebSocket: HyperliquidWebSocket,
   onWalletAdded: (address: string) => void,
