@@ -20,7 +20,7 @@ export async function loadTrades(address: string, reset: boolean = true) {
   tradesError.set(null);
 
   try {
-    const response = await api.getTrades(address, 50, currentOffset);
+    const response = await api.getTrades(address, 200, currentOffset);
 
     if (reset) {
       trades.set(response.trades);
