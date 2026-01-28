@@ -29,3 +29,8 @@ export interface PushSubscription {
     auth: string;
   };
 }
+
+export interface Wallet {
+  address: string;
+  name: string;
+}

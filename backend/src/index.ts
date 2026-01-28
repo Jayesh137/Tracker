@@ -109,7 +109,7 @@ async function main() {
   try {
     await hlWebSocket.connect();
     for (const wallet of storage.getWallets()) {
-      subscribeToWallet(wallet);
+      subscribeToWallet(wallet.address);
     }
   } catch (error) {
     console.error('[WebSocket] Initial connection failed, will retry...');

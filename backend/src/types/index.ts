@@ -74,8 +74,13 @@ export interface PushSubscription {
   };
 }
 
+export interface Wallet {
+  address: string;
+  name: string;
+}
+
 export interface Store {
-  wallets: string[];
+  wallets: Wallet[];
   pushSubscriptions: PushSubscription[];
   settings: {
     notificationsEnabled: boolean;

@@ -30,7 +30,7 @@ export function createRoutes(
 
   // Add wallet
   router.post('/wallets', async (req: Request, res: Response) => {
-    const { address } = req.body;
+    const { address, name } = req.body;
 
     if (!address || typeof address !== 'string') {
       res.status(400).json({ error: 'Address is required' });
@@ -44,15 +44,30 @@ export function createRoutes(
     }
 
     const wallets = storage.getWallets();
-    if (wallets.length >= 3) {
-      res.status(400).json({ error: 'Maximum 3 wallets allowed' });
+    if (wallets.length >= 10) {
+      res.status(400).json({ error: 'Maximum 10 wallets allowed' });
       return;
     }
 
-    await storage.addWallet(address);
+    const walletName = typeof name === 'string' ? name : '';
+    await storage.addWallet(address, walletName);
     onWalletAdded(address);
 
-    res.status(201).json({ success: true, address: address.toLowerCase() });
+    res.status(201).json({ success: true, address: address.toLowerCase(), name: walletName });
+  });
+
+  // Update wallet name
+  router.patch('/wallets/:address', async (req: Request, res: Response) => {
+    const { address } = req.params;
+    const { name } = req.body;
+
+    if (typeof name !== 'string') {
+      res.status(400).json({ error: 'Name is required' });
+      return;
+    }
+
+    await storage.updateWalletName(address, name);
+    res.json({ success: true, address: address.toLowerCase(), name });
   });
 
   // Remove wallet
