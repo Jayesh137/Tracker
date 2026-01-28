@@ -10,24 +10,48 @@ const API_URL = 'https://api.hyperliquid.xyz';
 
 export class HyperliquidClient {
   async getPositions(address: string): Promise<Position[]> {
-    const response = await fetch(`${API_URL}/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'clearinghouseState',
-        user: address
+    // Fetch from both default perp DEX and xyz DEX (spot perps)
+    const [defaultResponse, xyzResponse] = await Promise.all([
+      fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'clearinghouseState',
+          user: address
+        })
+      }),
+      fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'clearinghouseState',
+          user: address,
+          dex: 'xyz'
+        })
       })
-    });
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`Hyperliquid API error: ${response.status}`);
+    if (!defaultResponse.ok) {
+      throw new Error(`Hyperliquid API error: ${defaultResponse.status}`);
     }
 
-    const data: HyperliquidClearinghouseState = await response.json();
-
-    return data.assetPositions
+    const defaultData: HyperliquidClearinghouseState = await defaultResponse.json();
+    const defaultPositions = defaultData.assetPositions
       .filter(ap => parseFloat(ap.position.szi) !== 0)
       .map(ap => this.transformPosition(ap.position));
+
+    // xyz DEX might not exist for all wallets, so handle gracefully
+    let xyzPositions: Position[] = [];
+    if (xyzResponse.ok) {
+      const xyzData: HyperliquidClearinghouseState = await xyzResponse.json();
+      if (xyzData.assetPositions) {
+        xyzPositions = xyzData.assetPositions
+          .filter(ap => parseFloat(ap.position.szi) !== 0)
+          .map(ap => this.transformPosition(ap.position));
+      }
+    }
+
+    return [...defaultPositions, ...xyzPositions];
   }
 
   async getTrades(address: string): Promise<Trade[]> {
