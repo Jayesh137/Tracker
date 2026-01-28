@@ -39,8 +39,9 @@
       <span class="sub-value">{formatPrice(sizeUsd)}</span>
     </div>
     <div class="detail">
-      <span class="label">Entry</span>
-      <span class="value">{formatPrice(position.entryPrice)}</span>
+      <span class="label">Mark</span>
+      <span class="value">{formatPrice(position.currentPrice)}</span>
+      <span class="sub-value">Entry {formatPrice(position.entryPrice)}</span>
     </div>
     <div class="detail">
       <span class="label">Margin</span>

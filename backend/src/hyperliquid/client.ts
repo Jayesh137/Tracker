@@ -11,9 +11,23 @@ import type {
 const API_URL = 'https://api.hyperliquid.xyz';
 
 export class HyperliquidClient {
+  async getAllMids(): Promise<Record<string, string>> {
+    const response = await fetch(`${API_URL}/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'allMids' })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Hyperliquid API error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
   async getPositions(address: string): Promise<PositionsResponse> {
-    // Fetch from both default perp DEX and xyz DEX (spot perps)
-    const [defaultResponse, xyzResponse] = await Promise.all([
+    // Fetch positions and current prices in parallel
+    const [defaultResponse, xyzResponse, mids] = await Promise.all([
       fetch(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -30,7 +44,8 @@ export class HyperliquidClient {
           user: address,
           dex: 'xyz'
         })
-      })
+      }),
+      this.getAllMids()
     ]);
 
     if (!defaultResponse.ok) {
@@ -40,7 +55,7 @@ export class HyperliquidClient {
     const defaultData: HyperliquidClearinghouseState = await defaultResponse.json();
     const defaultPositions = defaultData.assetPositions
       .filter(ap => parseFloat(ap.position.szi) !== 0)
-      .map(ap => this.transformPosition(ap.position));
+      .map(ap => this.transformPosition(ap.position, mids[ap.position.coin]));
 
     // Extract account summary from default perp DEX
     const accountValue = parseFloat(defaultData.marginSummary.accountValue);
@@ -58,7 +73,7 @@ export class HyperliquidClient {
       if (xyzData.assetPositions) {
         xyzPositions = xyzData.assetPositions
           .filter(ap => parseFloat(ap.position.szi) !== 0)
-          .map(ap => this.transformPosition(ap.position));
+          .map(ap => this.transformPosition(ap.position, mids[ap.position.coin]));
       }
       // Add xyz account value to total
       if (xyzData.marginSummary) {
@@ -92,9 +107,10 @@ export class HyperliquidClient {
     return fills.map(fill => this.transformFill(fill));
   }
 
-  transformPosition(pos: HyperliquidPosition): Position {
+  transformPosition(pos: HyperliquidPosition, currentPriceStr?: string): Position {
     const size = parseFloat(pos.szi);
     const entryPrice = pos.entryPx ? parseFloat(pos.entryPx) : 0;
+    const currentPrice = currentPriceStr ? parseFloat(currentPriceStr) : entryPrice;
     const unrealizedPnl = parseFloat(pos.unrealizedPnl);
     const marginUsed = parseFloat(pos.marginUsed);
     const liquidationPx = pos.liquidationPx ? parseFloat(pos.liquidationPx) : null;
@@ -103,6 +119,7 @@ export class HyperliquidClient {
       coin: pos.coin,
       size: Math.abs(size),
       entryPrice,
+      currentPrice,
       unrealizedPnl,
       unrealizedPnlPercent: marginUsed > 0 ? (unrealizedPnl / marginUsed) * 100 : 0,
       side: size >= 0 ? 'long' : 'short',

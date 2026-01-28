@@ -2,6 +2,7 @@ export interface Position {
   coin: string;
   size: number;
   entryPrice: number;
+  currentPrice: number;
   unrealizedPnl: number;
   unrealizedPnlPercent: number;
   side: 'long' | 'short';
