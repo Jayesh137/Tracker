@@ -5,6 +5,7 @@
 
   $: isProfit = position.unrealizedPnl >= 0;
   $: isLong = position.side === 'long';
+  $: sizeUsd = position.size * position.entryPrice;
 
   function formatNumber(num: number, decimals: number = 2): string {
     return num.toLocaleString('en-US', {
@@ -35,10 +36,15 @@
     <div class="detail">
       <span class="label">Size</span>
       <span class="value">{formatNumber(position.size, 4)}</span>
+      <span class="sub-value">{formatPrice(sizeUsd)}</span>
     </div>
     <div class="detail">
       <span class="label">Entry</span>
       <span class="value">{formatPrice(position.entryPrice)}</span>
+    </div>
+    <div class="detail">
+      <span class="label">Margin</span>
+      <span class="value">{formatPrice(position.marginUsed)}</span>
     </div>
     <div class="detail">
       <span class="label">Liq</span>
@@ -136,6 +142,11 @@
   .value {
     font-size: 0.875rem;
     font-weight: 500;
+  }
+
+  .sub-value {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 
   .pnl {
