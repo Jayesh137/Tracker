@@ -3,6 +3,7 @@ import { Storage } from './storage/store.js';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import type { PushSubscription } from './types/index.js';
+import { getUpdates, sendTelegramMessage, configureTelegram } from './telegram/bot.js';
 
 export function createRoutes(
   storage: Storage,
@@ -129,6 +130,95 @@ export function createRoutes(
     }
 
     await storage.removePushSubscription(endpoint);
+    res.json({ success: true });
+  });
+
+  // Get Telegram config status
+  router.get('/telegram', (req: Request, res: Response) => {
+    const config = storage.getTelegramConfig();
+    res.json({
+      configured: !!config?.chatId,
+      enabled: config?.enabled ?? false
+    });
+  });
+
+  // Setup Telegram - Step 1: Validate bot token and get chat ID
+  router.post('/telegram/setup', async (req: Request, res: Response) => {
+    const { botToken } = req.body;
+
+    if (!botToken || typeof botToken !== 'string') {
+      res.status(400).json({ error: 'Bot token is required' });
+      return;
+    }
+
+    try {
+      // Get updates to find chat ID from recent messages
+      const updates = await getUpdates(botToken);
+
+      if (updates.length === 0) {
+        res.json({
+          success: false,
+          message: 'No messages found. Please send a message to your bot first, then try again.'
+        });
+        return;
+      }
+
+      // Get the most recent chat ID
+      const chatId = updates[updates.length - 1]?.message?.chat?.id;
+
+      if (!chatId) {
+        res.json({
+          success: false,
+          message: 'Could not find chat ID. Please send a message to your bot and try again.'
+        });
+        return;
+      }
+
+      // Save config and test
+      await storage.setTelegramConfig({
+        botToken,
+        chatId: String(chatId),
+        enabled: true
+      });
+
+      // Configure the bot module
+      configureTelegram(botToken, String(chatId));
+
+      // Send test message
+      const sent = await sendTelegramMessage('✅ HL Tracker connected! You will receive trade alerts here.');
+
+      if (sent) {
+        res.json({ success: true, message: 'Telegram configured successfully!' });
+      } else {
+        res.json({ success: false, message: 'Failed to send test message' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Toggle Telegram notifications
+  router.patch('/telegram', async (req: Request, res: Response) => {
+    const { enabled } = req.body;
+    const config = storage.getTelegramConfig();
+
+    if (!config) {
+      res.status(400).json({ error: 'Telegram not configured' });
+      return;
+    }
+
+    await storage.setTelegramConfig({ ...config, enabled: !!enabled });
+
+    if (enabled) {
+      configureTelegram(config.botToken, config.chatId);
+    }
+
+    res.json({ success: true, enabled: !!enabled });
+  });
+
+  // Disconnect Telegram
+  router.delete('/telegram', async (req: Request, res: Response) => {
+    await storage.clearTelegramConfig();
     res.json({ success: true });
   });
 

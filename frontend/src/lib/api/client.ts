@@ -65,5 +65,26 @@ export const api = {
 
   // Health
   getHealth: () =>
-    fetchJson<{ status: string; wallets: number; websocket: string; uptime: number }>('/health')
+    fetchJson<{ status: string; wallets: number; websocket: string; uptime: number }>('/health'),
+
+  // Telegram
+  getTelegramStatus: () =>
+    fetchJson<{ configured: boolean; enabled: boolean }>('/telegram'),
+
+  setupTelegram: (botToken: string) =>
+    fetchJson<{ success: boolean; message: string }>('/telegram/setup', {
+      method: 'POST',
+      body: JSON.stringify({ botToken })
+    }),
+
+  toggleTelegram: (enabled: boolean) =>
+    fetchJson<{ success: boolean; enabled: boolean }>('/telegram', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled })
+    }),
+
+  disconnectTelegram: () =>
+    fetchJson<{ success: boolean }>('/telegram', {
+      method: 'DELETE'
+    })
 };

@@ -79,10 +79,17 @@ export interface Wallet {
   name: string;
 }
 
+export interface TelegramConfig {
+  botToken: string;
+  chatId: string;
+  enabled: boolean;
+}
+
 export interface Store {
   wallets: Wallet[];
   pushSubscriptions: PushSubscription[];
   settings: {
     notificationsEnabled: boolean;
   };
+  telegram?: TelegramConfig;
 }
