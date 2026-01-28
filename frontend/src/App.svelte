@@ -14,7 +14,7 @@
     hasWallets
   } from './lib/stores/wallets';
   import { positions, positionsLoading, loadPositions } from './lib/stores/positions';
-  import { trades, tradesLoading, loadTrades } from './lib/stores/trades';
+  import { trades, tradesLoading, tradesHasMore, loadTrades, loadMoreTrades } from './lib/stores/trades';
 
   let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
@@ -109,11 +109,12 @@
           </div>
         {/if}
       {:else}
-        {#if $tradesLoading}
-          <p class="loading">Loading fills...</p>
-        {:else}
-          <FillsList fills={$trades} />
-        {/if}
+        <FillsList
+          fills={$trades}
+          hasMore={$tradesHasMore}
+          loading={$tradesLoading}
+          onLoadMore={() => $selectedWallet && loadMoreTrades($selectedWallet.address)}
+        />
       {/if}
     </div>
   {/if}
