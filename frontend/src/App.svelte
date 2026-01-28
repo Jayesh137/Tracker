@@ -4,6 +4,7 @@
   import PositionCard from './lib/components/PositionCard.svelte';
   import TradeList from './lib/components/TradeList.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
+  import NotificationSettings from './lib/components/NotificationSettings.svelte';
   import {
     wallets,
     selectedWallet,
@@ -53,6 +54,7 @@
 
   {#if showSettings}
     <div class="settings-panel">
+      <NotificationSettings />
       <AddWallet />
 
       {#if $wallets.length > 0}
