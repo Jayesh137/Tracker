@@ -1,47 +1,213 @@
 <script lang="ts">
-  import svelteLogo from './assets/svelte.svg'
-  import viteLogo from '/vite.svg'
-  import Counter from './lib/Counter.svelte'
+  import { onMount } from 'svelte';
+  import Header from './lib/components/Header.svelte';
+  import PositionCard from './lib/components/PositionCard.svelte';
+  import TradeList from './lib/components/TradeList.svelte';
+  import AddWallet from './lib/components/AddWallet.svelte';
+  import {
+    wallets,
+    selectedWallet,
+    loadWallets,
+    removeWallet,
+    hasWallets
+  } from './lib/stores/wallets';
+  import { positions, positionsLoading, loadPositions } from './lib/stores/positions';
+  import { trades, tradesLoading, loadTrades } from './lib/stores/trades';
+
+  let showSettings = false;
+  let refreshInterval: number;
+
+  onMount(async () => {
+    await loadWallets();
+
+    // Auto-refresh every 30 seconds
+    refreshInterval = setInterval(() => {
+      if ($selectedWallet) {
+        loadPositions($selectedWallet);
+        loadTrades($selectedWallet);
+      }
+    }, 30000);
+
+    return () => clearInterval(refreshInterval);
+  });
+
+  // Load data when selected wallet changes
+  $: if ($selectedWallet) {
+    loadPositions($selectedWallet);
+    loadTrades($selectedWallet);
+  }
+
+  function handleRemoveWallet(address: string) {
+    if (confirm(`Remove wallet ${address.slice(0, 10)}...?`)) {
+      removeWallet(address);
+    }
+  }
+
+  function shortenAddress(addr: string): string {
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  }
 </script>
 
 <main>
-  <div>
-    <a href="https://vite.dev" target="_blank" rel="noreferrer">
-      <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
-      <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
-  </div>
-  <h1>Vite + Svelte</h1>
+  <Header bind:showSettings />
 
-  <div class="card">
-    <Counter />
-  </div>
+  {#if showSettings}
+    <div class="settings-panel">
+      <AddWallet />
 
-  <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
-  </p>
+      {#if $wallets.length > 0}
+        <div class="wallet-list">
+          <h2>Tracked Wallets</h2>
+          <ul>
+            {#each $wallets as wallet}
+              <li>
+                <span>{shortenAddress(wallet)}</span>
+                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet)}>
+                  ✕
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+    </div>
+  {:else if !$hasWallets}
+    <div class="empty-state">
+      <h2>No wallets tracked</h2>
+      <p>Add a wallet to start tracking trades</p>
+      <button on:click={() => showSettings = true}>Add Wallet</button>
+    </div>
+  {:else}
+    <div class="dashboard">
+      {#if $positionsLoading}
+        <p class="loading">Loading positions...</p>
+      {:else if $positions.length > 0}
+        <section class="positions">
+          <h2>Open Positions</h2>
+          <div class="position-grid">
+            {#each $positions as position (position.coin)}
+              <PositionCard {position} />
+            {/each}
+          </div>
+        </section>
+      {:else}
+        <p class="no-positions">No open positions</p>
+      {/if}
 
-  <p class="read-the-docs">
-    Click on the Vite and Svelte logos to learn more
-  </p>
+      <section class="trades">
+        {#if $tradesLoading}
+          <p class="loading">Loading trades...</p>
+        {:else}
+          <TradeList trades={$trades} />
+        {/if}
+      </section>
+    </div>
+  {/if}
 </main>
 
 <style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-    transition: filter 300ms;
+  main {
+    min-height: 100vh;
+    background: #0f172a;
+    color: #f1f5f9;
   }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
+
+  .dashboard {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
-  .logo.svelte:hover {
-    filter: drop-shadow(0 0 2em #ff3e00aa);
+
+  .positions h2, .trades h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: #94a3b8;
   }
-  .read-the-docs {
-    color: #888;
+
+  .position-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .loading, .no-positions {
+    text-align: center;
+    color: #64748b;
+    padding: 2rem;
+  }
+
+  .settings-panel {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .wallet-list {
+    background: #1e293b;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border: 1px solid #334155;
+  }
+
+  .wallet-list h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+  }
+
+  .wallet-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .wallet-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #334155;
+  }
+
+  .wallet-list li:last-child {
+    border-bottom: none;
+  }
+
+  .remove-btn {
+    background: transparent;
+    border: none;
+    color: #f87171;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    text-align: center;
+  }
+
+  .empty-state h2 {
+    margin: 0 0 0.5rem 0;
+  }
+
+  .empty-state p {
+    color: #64748b;
+    margin: 0 0 1.5rem 0;
+  }
+
+  .empty-state button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    cursor: pointer;
   }
 </style>
