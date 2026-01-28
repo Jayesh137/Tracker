@@ -4,9 +4,16 @@
   export let fill: Trade;
   let expanded = false;
 
-  $: isLong = fill.side === 'buy';
+  // Determine position type from direction (Open Long, Close Short, etc.)
+  $: isLongPosition = fill.direction?.includes('Long') ?? fill.side === 'buy';
+  $: isShortPosition = fill.direction?.includes('Short') ?? fill.side === 'sell';
+  $: isOpen = fill.direction?.includes('Open') ?? false;
+  $: isClose = fill.direction?.includes('Close') ?? false;
   $: isProfit = (fill.closedPnl ?? 0) > 0;
   $: isLoss = (fill.closedPnl ?? 0) < 0;
+
+  // Display text: "Open Long", "Close Short", or fallback to BUY/SELL
+  $: actionText = fill.direction || (fill.side === 'buy' ? 'BUY' : 'SELL');
 
   function formatTime(timestamp: number): string {
     return new Date(timestamp).toLocaleTimeString('en-US', {
@@ -33,10 +40,9 @@
   <div class="summary">
     <span class="time">{formatTime(fill.timestamp)}</span>
     <span class="coin">{fill.coin}</span>
-    <span class="side" class:long={isLong} class:short={!isLong}>
-      {isLong ? 'LONG' : 'SHORT'}
+    <span class="action" class:long={isLongPosition} class:short={isShortPosition}>
+      {actionText}
     </span>
-    <span class="direction">{fill.direction || '—'}</span>
     <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
       {formatPnl(fill.closedPnl)}
     </span>
@@ -96,27 +102,22 @@
     min-width: 50px;
   }
 
-  .side {
-    font-size: 0.7rem;
+  .action {
+    font-size: 0.65rem;
     font-weight: 600;
     padding: 0.15rem 0.4rem;
     border-radius: 0.2rem;
+    flex: 1;
   }
 
-  .side.long {
+  .action.long {
     background: rgba(34, 197, 94, 0.15);
     color: var(--green);
   }
 
-  .side.short {
+  .action.short {
     background: rgba(239, 68, 68, 0.15);
     color: var(--red);
-  }
-
-  .direction {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    flex: 1;
   }
 
   .pnl {
