@@ -15,7 +15,7 @@
   } from './lib/stores/wallets';
   import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
 import AccountBalance from './lib/components/AccountBalance.svelte';
-  import { trades, tradesLoading, loadTrades } from './lib/stores/trades';
+  import { trades, tradesLoading, loadTrades, resetTradesState } from './lib/stores/trades';
 
   let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
@@ -41,6 +41,7 @@ import AccountBalance from './lib/components/AccountBalance.svelte';
   });
 
   $: if ($selectedWallet) {
+    resetTradesState();
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
   }
