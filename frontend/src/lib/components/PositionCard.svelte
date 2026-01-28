@@ -3,59 +3,92 @@
 
   export let position: Position;
 
-  $: pnlClass = position.unrealizedPnl >= 0 ? 'profit' : 'loss';
-  $: sideClass = position.side;
+  $: isProfit = position.unrealizedPnl >= 0;
+  $: isLong = position.side === 'long';
+
+  function formatNumber(num: number, decimals: number = 2): string {
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  }
+
+  function formatPrice(price: number): string {
+    if (price >= 1000) return '$' + formatNumber(price, 0);
+    if (price >= 1) return '$' + formatNumber(price, 2);
+    return '$' + formatNumber(price, 4);
+  }
 </script>
 
-<div class="position-card">
+<div class="position-card" class:long={isLong} class:short={!isLong}>
   <div class="header">
     <span class="coin">{position.coin}-PERP</span>
-    <span class="side {sideClass}">{position.side.toUpperCase()}</span>
+    <div class="side-leverage">
+      <span class="side" class:long={isLong} class:short={!isLong}>
+        {position.side.toUpperCase()}
+      </span>
+      <span class="leverage">{position.leverage}x</span>
+    </div>
   </div>
 
   <div class="details">
-    <div class="row">
+    <div class="detail">
       <span class="label">Size</span>
-      <span class="value">{position.size.toFixed(4)}</span>
+      <span class="value">{formatNumber(position.size, 4)}</span>
     </div>
-    <div class="row">
+    <div class="detail">
       <span class="label">Entry</span>
-      <span class="value">${position.entryPrice.toLocaleString()}</span>
+      <span class="value">{formatPrice(position.entryPrice)}</span>
     </div>
-    <div class="row">
-      <span class="label">Leverage</span>
-      <span class="value">{position.leverage}x</span>
+    <div class="detail">
+      <span class="label">Liq</span>
+      <span class="value">{position.liquidationPrice ? formatPrice(position.liquidationPrice) : '—'}</span>
     </div>
   </div>
 
-  <div class="pnl {pnlClass}">
+  <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
     <span class="pnl-value">
-      {position.unrealizedPnl >= 0 ? '+' : ''}${position.unrealizedPnl.toFixed(2)}
+      {isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}
     </span>
     <span class="pnl-percent">
-      ({position.unrealizedPnlPercent >= 0 ? '+' : ''}{position.unrealizedPnlPercent.toFixed(2)}%)
+      {isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%
     </span>
   </div>
 </div>
 
 <style>
   .position-card {
-    background: #1e293b;
-    border-radius: 0.5rem;
+    background: var(--bg-card);
+    border-radius: 0.75rem;
     padding: 1rem;
-    border: 1px solid #334155;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border);
+  }
+
+  .position-card.long {
+    border-left-color: var(--green);
+  }
+
+  .position-card.short {
+    border-left-color: var(--red);
   }
 
   .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
   }
 
   .coin {
     font-weight: 600;
-    color: #f1f5f9;
+    font-size: 1rem;
+  }
+
+  .side-leverage {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .side {
@@ -66,51 +99,66 @@
   }
 
   .side.long {
-    background: #166534;
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--green);
   }
 
   .side.short {
-    background: #991b1b;
-    color: #f87171;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--red);
+  }
+
+  .leverage {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
   }
 
   .details {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-bottom: 0.75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
   }
 
-  .row {
+  .detail {
     display: flex;
-    justify-content: space-between;
-    font-size: 0.875rem;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .label {
-    color: #94a3b8;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 
   .value {
-    color: #e2e8f0;
+    font-size: 0.875rem;
+    font-weight: 500;
   }
 
   .pnl {
-    text-align: right;
-    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
   }
 
   .pnl.profit {
-    color: #4ade80;
+    color: var(--green);
   }
 
   .pnl.loss {
-    color: #f87171;
+    color: var(--red);
+  }
+
+  .pnl-value {
+    font-size: 1.25rem;
+    font-weight: 600;
   }
 
   .pnl-percent {
     font-size: 0.875rem;
-    opacity: 0.8;
+    font-weight: 500;
   }
 </style>
