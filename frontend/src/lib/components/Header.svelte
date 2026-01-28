@@ -1,48 +1,52 @@
 <script lang="ts">
-  import WalletSelector from './WalletSelector.svelte';
+  import WalletDropdown from './WalletDropdown.svelte';
 
-  export let showSettings = false;
+  export let onAddWallet: () => void = () => {};
+  export let onOpenSettings: () => void = () => {};
 </script>
 
 <header>
-  <div class="title">
-    <h1>HL Tracker</h1>
-  </div>
-  <div class="controls">
-    <WalletSelector />
-    <button class="settings-btn" on:click={() => showSettings = !showSettings}>
-      ⚙️
-    </button>
-  </div>
+  <span class="logo">HL Tracker</span>
+  <WalletDropdown {onAddWallet} />
+  <button class="settings" on:click={onOpenSettings} aria-label="Settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"></circle>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  </button>
 </header>
 
 <style>
   header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    background: #1e293b;
-    border-bottom: 1px solid #334155;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
   }
 
-  h1 {
-    margin: 0;
-    font-size: 1.25rem;
-    color: #f1f5f9;
+  .logo {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
   }
 
-  .controls {
+  .settings {
     display: flex;
-    gap: 0.5rem;
     align-items: center;
-  }
-
-  .settings-btn {
+    justify-content: center;
     background: transparent;
     border: none;
-    font-size: 1.25rem;
+    color: var(--text-secondary);
     cursor: pointer;
     padding: 0.5rem;
+    border-radius: 0.375rem;
+    transition: color 0.15s, background 0.15s;
+  }
+
+  .settings:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
   }
 </style>
