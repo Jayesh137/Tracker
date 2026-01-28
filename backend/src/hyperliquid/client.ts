@@ -97,7 +97,7 @@ export class HyperliquidClient {
       id: `${fill.tid}`,
       coin: fill.coin,
       side: fill.side === 'B' ? 'buy' : 'sell',
-      direction: fill.dir as 'Open' | 'Close' | '',
+      direction: fill.dir || '',
       size: parseFloat(fill.sz),
       price: parseFloat(fill.px),
       closedPnl: fill.closedPnl ? parseFloat(fill.closedPnl) : null,

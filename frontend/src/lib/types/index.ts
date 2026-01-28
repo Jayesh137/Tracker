@@ -14,7 +14,7 @@ export interface Trade {
   id: string;
   coin: string;
   side: 'buy' | 'sell';
-  direction: 'Open' | 'Close' | '';
+  direction: string; // "Open Long", "Open Short", "Close Long", "Close Short", or ""
   size: number;
   price: number;
   closedPnl: number | null;
