@@ -5,7 +5,7 @@
 
   $: isProfit = position.unrealizedPnl >= 0;
   $: isLong = position.side === 'long';
-  $: sizeUsd = position.size * position.entryPrice;
+  $: sizeUsd = position.size * position.currentPrice;
 
   function formatNumber(num: number, decimals: number = 2): string {
     return num.toLocaleString('en-US', {
@@ -19,127 +19,156 @@
     if (price >= 1) return '$' + formatNumber(price, 2);
     return '$' + formatNumber(price, 4);
   }
+
+  function formatCompact(num: number): string {
+    if (num >= 1000000) return '$' + (num / 1000000).toFixed(2) + 'M';
+    if (num >= 1000) return '$' + (num / 1000).toFixed(1) + 'K';
+    return formatPrice(num);
+  }
 </script>
 
 <div class="position-card" class:long={isLong} class:short={!isLong}>
-  <div class="header">
-    <div class="header-left">
+  <div class="top-row">
+    <div class="asset-info">
       <span class="coin">{position.coin}</span>
-      <div class="side-leverage">
-        <span class="side" class:long={isLong} class:short={!isLong}>
-          {position.side.toUpperCase()}
-        </span>
-        <span class="leverage">{position.leverage}x</span>
+      <span class="badge" class:long={isLong} class:short={!isLong}>
+        {position.side.toUpperCase()} {position.leverage}x
+      </span>
+    </div>
+    <div class="size-block">
+      <span class="size-usd">{formatCompact(sizeUsd)}</span>
+      <span class="size-coin">{formatNumber(position.size, 4)} {position.coin}</span>
+    </div>
+  </div>
+
+  <div class="price-row">
+    <div class="price-group">
+      <div class="price-item">
+        <span class="price-label">Entry</span>
+        <span class="price-val">{formatPrice(position.entryPrice)}</span>
+      </div>
+      <span class="price-arrow">→</span>
+      <div class="price-item">
+        <span class="price-label">Mark</span>
+        <span class="price-val">{formatPrice(position.currentPrice)}</span>
       </div>
     </div>
-    <span class="size-usd">{formatPrice(sizeUsd)}</span>
   </div>
 
-  <div class="prices">
-    <div class="price-item">
-      <span class="label">Entry</span>
-      <span class="price-value">{formatPrice(position.entryPrice)}</span>
-    </div>
-    <div class="price-item">
-      <span class="label">Mark</span>
-      <span class="price-value">{formatPrice(position.currentPrice)}</span>
-    </div>
-  </div>
-
-  <div class="pnl-row">
+  <div class="bottom-row">
     <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
-      <span class="pnl-value">
-        {isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}
+      <span class="pnl-amount">{isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}</span>
+      <span class="pnl-pct">{isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%</span>
+    </div>
+    <div class="meta">
+      <span class="meta-item">
+        <span class="meta-label">Margin</span>
+        <span class="meta-val">{formatPrice(position.marginUsed)}</span>
       </span>
-      <span class="pnl-percent">
-        {isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%
+      <span class="meta-item">
+        <span class="meta-label">Liq</span>
+        <span class="meta-val liq">{position.liquidationPrice ? formatPrice(position.liquidationPrice) : '—'}</span>
       </span>
     </div>
-  </div>
-
-  <div class="secondary">
-    <span>Size: {formatNumber(position.size, 4)}</span>
-    <span>Margin: {formatPrice(position.marginUsed)}</span>
-    <span>Liq: {position.liquidationPrice ? formatPrice(position.liquidationPrice) : '—'}</span>
   </div>
 </div>
 
 <style>
   .position-card {
     background: var(--bg-card);
-    border-radius: 0.75rem;
-    padding: 1rem;
+    border-radius: 12px;
+    padding: 1rem 1.125rem;
     border: 1px solid var(--border);
-    border-left: 3px solid var(--border);
+    position: relative;
+    overflow: hidden;
   }
 
-  .position-card.long {
-    border-left-color: var(--green);
+  .position-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
   }
 
-  .position-card.short {
-    border-left-color: var(--red);
+  .position-card.long::before {
+    background: var(--green);
   }
 
-  .header {
+  .position-card.short::before {
+    background: var(--red);
+  }
+
+  .top-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
   }
 
-  .header-left {
+  .asset-info {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-  }
-
-  .coin {
-    font-weight: 600;
-    font-size: 1.125rem;
-  }
-
-  .side-leverage {
-    display: flex;
-    align-items: center;
     gap: 0.5rem;
   }
 
-  .side {
-    font-size: 0.7rem;
-    font-weight: 600;
-    padding: 0.2rem 0.4rem;
-    border-radius: 0.25rem;
+  .coin {
+    font-weight: 700;
+    font-size: 1.25rem;
+    letter-spacing: -0.02em;
   }
 
-  .side.long {
-    background: rgba(34, 197, 94, 0.15);
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    width: fit-content;
+    letter-spacing: 0.02em;
+  }
+
+  .badge.long {
+    background: rgba(34, 197, 94, 0.12);
     color: var(--green);
   }
 
-  .side.short {
-    background: rgba(239, 68, 68, 0.15);
+  .badge.short {
+    background: rgba(239, 68, 68, 0.12);
     color: var(--red);
   }
 
-  .leverage {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    font-weight: 500;
+  .size-block {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .size-usd {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     font-weight: 700;
-    color: var(--text-primary);
+    letter-spacing: -0.03em;
+    line-height: 1;
   }
 
-  .prices {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.75rem;
+  .size-coin {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .price-row {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
     border-bottom: 1px solid var(--border);
+  }
+
+  .price-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
 
   .price-item {
@@ -148,25 +177,35 @@
     gap: 0.125rem;
   }
 
-  .label {
-    font-size: 0.7rem;
+  .price-label {
+    font-size: 0.6875rem;
     color: var(--text-secondary);
     text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
-  .price-value {
+  .price-val {
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  .pnl-row {
-    margin-bottom: 0.75rem;
+  .price-arrow {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+  }
+
+  .bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
   }
 
   .pnl {
     display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.125rem;
   }
 
   .pnl.profit {
@@ -177,21 +216,45 @@
     color: var(--red);
   }
 
-  .pnl-value {
-    font-size: 1.25rem;
-    font-weight: 600;
+  .pnl-amount {
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
   }
 
-  .pnl-percent {
+  .pnl-pct {
     font-size: 0.875rem;
     font-weight: 500;
   }
 
-  .secondary {
+  .meta {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    font-size: 0.75rem;
+    gap: 1rem;
+    text-align: right;
+  }
+
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .meta-label {
+    font-size: 0.625rem;
     color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .meta-val {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .meta-val.liq {
+    color: var(--text-secondary);
+    opacity: 0.7;
   }
 </style>
