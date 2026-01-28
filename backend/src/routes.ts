@@ -93,13 +93,15 @@ export function createRoutes(
     }
   });
 
-  // Get trades for wallet
+  // Get trades for wallet (with pagination)
   router.get('/wallet/:address/trades', async (req: Request, res: Response) => {
     const { address } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
 
     try {
-      const trades = await hlClient.getTrades(address);
-      res.json(trades);
+      const result = await hlClient.getTrades(address, limit, offset);
+      res.json(result);
     } catch (error: any) {
       console.error('Failed to fetch trades:', error.message);
       res.status(500).json({ error: 'Failed to fetch trades' });
