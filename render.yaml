@@ -3,7 +3,7 @@ services:
     name: hl-tracker
     runtime: node
     plan: free
-    buildCommand: cd frontend && npm ci && npm run build && cd ../backend && npm ci && npm run build
+    buildCommand: npm install --prefix frontend --include=dev && npm run --prefix frontend build && npm install --prefix backend --include=dev && npm run --prefix backend build
     startCommand: cd backend && npm start
     envVars:
       - key: NODE_ENV
