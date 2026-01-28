@@ -10,7 +10,6 @@ import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
 import { formatTradeNotification } from './notifications/formatter.js';
 import { createRoutes } from './routes.js';
-import { configureTelegram, sendTradeAlert, isTelegramConfigured } from './telegram/bot.js';
 import type { HyperliquidFill } from './types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,13 +23,6 @@ async function main() {
   const storage = new Storage('./data/store.json');
   await storage.load();
   console.log(`[Storage] Loaded ${storage.getWallets().length} wallets`);
-
-  // Initialize Telegram if configured
-  const telegramConfig = storage.getTelegramConfig();
-  if (telegramConfig?.enabled && telegramConfig.botToken && telegramConfig.chatId) {
-    configureTelegram(telegramConfig.botToken, telegramConfig.chatId);
-    console.log('[Telegram] Notifications enabled');
-  }
 
   // Initialize Hyperliquid clients
   const hlClient = new HyperliquidClient();
@@ -48,15 +40,10 @@ async function main() {
   }
 
   // Handle incoming fills (trades)
-  const handleFill = async (fill: HyperliquidFill, walletAddress: string) => {
-    console.log(`[Fill] ${walletAddress} traded ${fill.sz} ${fill.coin} @ ${fill.px}`);
+  const handleFill = async (fill: HyperliquidFill, wallet: string) => {
+    console.log(`[Fill] ${wallet} traded ${fill.sz} ${fill.coin} @ ${fill.px}`);
 
-    // Get wallet name for notifications
-    const wallet = storage.getWallets().find(w => w.address === walletAddress.toLowerCase());
-    const walletName = wallet?.name || walletAddress.slice(0, 10) + '...';
-
-    // Send push notifications
-    const { title, body } = formatTradeNotification(fill, walletAddress);
+    const { title, body } = formatTradeNotification(fill, wallet);
     const subscriptions = storage.getPushSubscriptions();
 
     if (subscriptions.length > 0) {
@@ -66,20 +53,6 @@ async function main() {
       for (const endpoint of expired) {
         await storage.removePushSubscription(endpoint);
       }
-    }
-
-    // Send Telegram notification
-    if (isTelegramConfigured()) {
-      const side = fill.side === 'B' ? 'buy' : 'sell';
-      const pnl = fill.closedPnl ? parseFloat(fill.closedPnl) : undefined;
-      await sendTradeAlert(
-        walletName,
-        fill.coin,
-        side,
-        parseFloat(fill.sz),
-        parseFloat(fill.px),
-        pnl
-      );
     }
   };
 

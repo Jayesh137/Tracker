@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { Store, PushSubscription, Wallet, TelegramConfig } from '../types/index.js';
+import type { Store, PushSubscription, Wallet } from '../types/index.js';
 
 const MAX_WALLETS = 10;
 
@@ -46,8 +46,7 @@ export class Storage {
       this.store = {
         wallets: parsed.wallets || [],
         pushSubscriptions: parsed.pushSubscriptions || [],
-        settings: { ...DEFAULT_STORE.settings, ...parsed.settings },
-        telegram: parsed.telegram
+        settings: { ...DEFAULT_STORE.settings, ...parsed.settings }
       };
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -133,20 +132,5 @@ export class Storage {
   // Settings
   getSettings() {
     return { ...this.store.settings };
-  }
-
-  // Telegram
-  getTelegramConfig(): TelegramConfig | undefined {
-    return this.store.telegram;
-  }
-
-  async setTelegramConfig(config: TelegramConfig): Promise<void> {
-    this.store.telegram = config;
-    await this.save();
-  }
-
-  async clearTelegramConfig(): Promise<void> {
-    this.store.telegram = undefined;
-    await this.save();
   }
 }

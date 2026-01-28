@@ -6,7 +6,6 @@
   import FillsList from './lib/components/FillsList.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
-  import TelegramSettings from './lib/components/TelegramSettings.svelte';
   import {
     wallets,
     selectedWallet,
@@ -66,8 +65,6 @@
       </div>
 
       <NotificationSettings />
-
-      <TelegramSettings />
 
       <div class="wallet-section">
         <div class="section-header">
