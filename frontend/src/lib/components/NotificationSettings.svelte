@@ -1,13 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { setupPushNotifications, unsubscribePushNotifications, isPushEnabled } from '../utils/push';
+  import { soundEnabled, testSound } from '../utils/sound';
 
-  let enabled = false;
+  let pushEnabled = false;
   let loading = true;
   let error = '';
 
   onMount(async () => {
-    enabled = await isPushEnabled();
+    pushEnabled = await isPushEnabled();
     loading = false;
   });
 
@@ -16,12 +17,12 @@
     error = '';
 
     try {
-      if (enabled) {
+      if (pushEnabled) {
         await unsubscribePushNotifications();
-        enabled = false;
+        pushEnabled = false;
       } else {
         const success = await setupPushNotifications();
-        enabled = success;
+        pushEnabled = success;
         if (!success) {
           error = 'Failed to enable notifications. Please check permissions.';
         }
@@ -32,6 +33,14 @@
 
     loading = false;
   }
+
+  function toggleSound() {
+    soundEnabled.update(v => !v);
+  }
+
+  function handleTestSound() {
+    testSound();
+  }
 </script>
 
 <div class="notification-settings">
@@ -41,11 +50,11 @@
     <span>Push notifications</span>
     <button
       class="toggle"
-      class:enabled
+      class:enabled={pushEnabled}
       on:click={toggleNotifications}
       disabled={loading}
     >
-      {loading ? '...' : enabled ? 'ON' : 'OFF'}
+      {loading ? '...' : pushEnabled ? 'ON' : 'OFF'}
     </button>
   </div>
 
@@ -54,26 +63,49 @@
   {/if}
 
   <p class="hint">
-    {#if enabled}
+    {#if pushEnabled}
       You'll receive alerts when tracked wallets make trades.
     {:else}
       Enable to receive trade alerts even when the app is closed.
     {/if}
   </p>
+
+  <div class="divider"></div>
+
+  <div class="toggle-row">
+    <span>Alert sound (when app open)</span>
+    <button
+      class="toggle"
+      class:enabled={$soundEnabled}
+      on:click={toggleSound}
+    >
+      {$soundEnabled ? 'ON' : 'OFF'}
+    </button>
+  </div>
+
+  {#if $soundEnabled}
+    <button class="test-btn" on:click={handleTestSound}>
+      Test Sound
+    </button>
+  {/if}
+
+  <p class="hint">
+    Plays a beep when new trades are detected while the app is open.
+  </p>
 </div>
 
 <style>
   .notification-settings {
-    background: #1e293b;
-    border-radius: 0.5rem;
+    background: var(--bg-card);
+    border-radius: 0.75rem;
     padding: 1rem;
-    border: 1px solid #334155;
+    border: 1px solid var(--border);
   }
 
   h2 {
     margin: 0 0 1rem 0;
     font-size: 1rem;
-    color: #f1f5f9;
+    color: var(--text-primary);
   }
 
   .toggle-row {
@@ -82,9 +114,13 @@
     align-items: center;
   }
 
+  .toggle-row span {
+    font-size: 0.875rem;
+  }
+
   .toggle {
-    background: #475569;
-    color: #94a3b8;
+    background: var(--border);
+    color: var(--text-secondary);
     border: none;
     border-radius: 0.375rem;
     padding: 0.5rem 1rem;
@@ -94,22 +130,40 @@
   }
 
   .toggle.enabled {
-    background: #166534;
-    color: #4ade80;
+    background: rgba(34, 197, 94, 0.2);
+    color: var(--green);
   }
 
   .toggle:disabled {
     opacity: 0.5;
   }
 
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1rem 0;
+  }
+
+  .test-btn {
+    margin-top: 0.75rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 0.375rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    width: 100%;
+  }
+
   .error {
-    color: #f87171;
+    color: var(--red);
     font-size: 0.875rem;
     margin: 0.5rem 0 0 0;
   }
 
   .hint {
-    color: #64748b;
+    color: var(--text-secondary);
     font-size: 0.75rem;
     margin: 0.75rem 0 0 0;
   }
