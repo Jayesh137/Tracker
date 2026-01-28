@@ -23,43 +23,44 @@
 
 <div class="position-card" class:long={isLong} class:short={!isLong}>
   <div class="header">
-    <span class="coin">{position.coin}-PERP</span>
-    <div class="side-leverage">
-      <span class="side" class:long={isLong} class:short={!isLong}>
-        {position.side.toUpperCase()}
-      </span>
-      <span class="leverage">{position.leverage}x</span>
+    <div class="header-left">
+      <span class="coin">{position.coin}</span>
+      <div class="side-leverage">
+        <span class="side" class:long={isLong} class:short={!isLong}>
+          {position.side.toUpperCase()}
+        </span>
+        <span class="leverage">{position.leverage}x</span>
+      </div>
     </div>
+    <span class="size-usd">{formatPrice(sizeUsd)}</span>
   </div>
 
-  <div class="details">
-    <div class="detail">
-      <span class="label">Size</span>
-      <span class="value">{formatNumber(position.size, 4)}</span>
-      <span class="sub-value">{formatPrice(sizeUsd)}</span>
+  <div class="prices">
+    <div class="price-item">
+      <span class="label">Entry</span>
+      <span class="price-value">{formatPrice(position.entryPrice)}</span>
     </div>
-    <div class="detail">
+    <div class="price-item">
       <span class="label">Mark</span>
-      <span class="value">{formatPrice(position.currentPrice)}</span>
-      <span class="sub-value">Entry {formatPrice(position.entryPrice)}</span>
-    </div>
-    <div class="detail">
-      <span class="label">Margin</span>
-      <span class="value">{formatPrice(position.marginUsed)}</span>
-    </div>
-    <div class="detail">
-      <span class="label">Liq</span>
-      <span class="value">{position.liquidationPrice ? formatPrice(position.liquidationPrice) : '—'}</span>
+      <span class="price-value">{formatPrice(position.currentPrice)}</span>
     </div>
   </div>
 
-  <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
-    <span class="pnl-value">
-      {isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}
-    </span>
-    <span class="pnl-percent">
-      {isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%
-    </span>
+  <div class="pnl-row">
+    <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
+      <span class="pnl-value">
+        {isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}
+      </span>
+      <span class="pnl-percent">
+        {isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%
+      </span>
+    </div>
+  </div>
+
+  <div class="secondary">
+    <span>Size: {formatNumber(position.size, 4)}</span>
+    <span>Margin: {formatPrice(position.marginUsed)}</span>
+    <span>Liq: {position.liquidationPrice ? formatPrice(position.liquidationPrice) : '—'}</span>
   </div>
 </div>
 
@@ -83,13 +84,19 @@
   .header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+  }
+
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
   }
 
   .coin {
     font-weight: 600;
-    font-size: 1rem;
+    font-size: 1.125rem;
   }
 
   .side-leverage {
@@ -99,9 +106,9 @@
   }
 
   .side {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.4rem;
     border-radius: 0.25rem;
   }
 
@@ -121,39 +128,45 @@
     font-weight: 500;
   }
 
-  .details {
+  .size-usd {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .prices {
     display: flex;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
+    gap: 1.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
     border-bottom: 1px solid var(--border);
   }
 
-  .detail {
+  .price-item {
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
+    gap: 0.125rem;
   }
 
   .label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-secondary);
+    text-transform: uppercase;
   }
 
-  .value {
-    font-size: 0.875rem;
+  .price-value {
+    font-size: 1rem;
     font-weight: 500;
   }
 
-  .sub-value {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+  .pnl-row {
+    margin-bottom: 0.75rem;
   }
 
   .pnl {
     display: flex;
-    justify-content: space-between;
     align-items: baseline;
+    gap: 0.5rem;
   }
 
   .pnl.profit {
@@ -172,5 +185,13 @@
   .pnl-percent {
     font-size: 0.875rem;
     font-weight: 500;
+  }
+
+  .secondary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
 </style>
