@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import Header from './lib/components/Header.svelte';
+  import TabBar from './lib/components/TabBar.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
-  import TradeList from './lib/components/TradeList.svelte';
+  import FillsList from './lib/components/FillsList.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
   import {
@@ -15,13 +16,14 @@
   import { positions, positionsLoading, loadPositions } from './lib/stores/positions';
   import { trades, tradesLoading, loadTrades } from './lib/stores/trades';
 
+  let activeTab: 'positions' | 'fills' = 'positions';
+  let showAddWallet = false;
   let showSettings = false;
-  let refreshInterval: number;
+  let refreshInterval: ReturnType<typeof setInterval>;
 
-  onMount(async () => {
-    await loadWallets();
+  onMount(() => {
+    loadWallets();
 
-    // Auto-refresh every 30 seconds
     refreshInterval = setInterval(() => {
       if ($selectedWallet) {
         loadPositions($selectedWallet.address);
@@ -32,134 +34,225 @@
     return () => clearInterval(refreshInterval);
   });
 
-  // Load data when selected wallet changes
   $: if ($selectedWallet) {
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
   }
 
-  function handleRemoveWallet(address: string) {
-    if (confirm(`Remove wallet ${address.slice(0, 10)}...?`)) {
+  function handleRemoveWallet(address: string, name: string) {
+    if (confirm(`Remove wallet "${name}"?`)) {
       removeWallet(address);
     }
-  }
-
-  function getWalletDisplayName(wallet: { address: string; name: string }): string {
-    if (wallet.name) return wallet.name;
-    return `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
   }
 </script>
 
 <main>
-  <Header bind:showSettings />
+  <Header
+    onAddWallet={() => showAddWallet = true}
+    onOpenSettings={() => showSettings = true}
+  />
 
   {#if showSettings}
     <div class="settings-panel">
-      <NotificationSettings />
-      <AddWallet />
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="close" on:click={() => showSettings = false}>✕</button>
+      </div>
 
-      {#if $wallets.length > 0}
-        <div class="wallet-list">
-          <h2>Tracked Wallets</h2>
-          <ul>
-            {#each $wallets as wallet}
+      <NotificationSettings />
+
+      <div class="wallet-section">
+        <div class="section-header">
+          <h3>Tracked Wallets</h3>
+          <button class="add-btn" on:click={() => showAddWallet = true}>+ Add</button>
+        </div>
+
+        {#if $wallets.length === 0}
+          <p class="no-wallets">No wallets tracked</p>
+        {:else}
+          <ul class="wallet-list">
+            {#each $wallets as wallet (wallet.address)}
               <li>
-                <span>{getWalletDisplayName(wallet)}</span>
-                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet.address)}>
+                <span class="wallet-name">{wallet.name}</span>
+                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet.address, wallet.name)}>
                   ✕
                 </button>
               </li>
             {/each}
           </ul>
-        </div>
-      {/if}
+        {/if}
+      </div>
     </div>
+
   {:else if !$hasWallets}
     <div class="empty-state">
+      <div class="empty-icon">📊</div>
       <h2>No wallets tracked</h2>
       <p>Add a wallet to start tracking trades</p>
-      <button on:click={() => showSettings = true}>Add Wallet</button>
+      <button class="primary-btn" on:click={() => showAddWallet = true}>Add Wallet</button>
     </div>
+
   {:else}
-    <div class="dashboard">
-      {#if $positionsLoading}
-        <p class="loading">Loading positions...</p>
-      {:else if $positions.length > 0}
-        <section class="positions">
-          <h2>Open Positions</h2>
-          <div class="position-grid">
+    <TabBar bind:activeTab />
+
+    <div class="content">
+      {#if activeTab === 'positions'}
+        {#if $positionsLoading}
+          <p class="loading">Loading positions...</p>
+        {:else if $positions.length === 0}
+          <p class="empty">No open positions</p>
+        {:else}
+          <div class="positions-grid">
             {#each $positions as position (position.coin)}
               <PositionCard {position} />
             {/each}
           </div>
-        </section>
-      {:else}
-        <p class="no-positions">No open positions</p>
-      {/if}
-
-      <section class="trades">
-        {#if $tradesLoading}
-          <p class="loading">Loading trades...</p>
-        {:else}
-          <TradeList trades={$trades} />
         {/if}
-      </section>
+      {:else}
+        {#if $tradesLoading}
+          <p class="loading">Loading fills...</p>
+        {:else}
+          <FillsList fills={$trades} />
+        {/if}
+      {/if}
     </div>
   {/if}
 </main>
 
+{#if showAddWallet}
+  <AddWallet onClose={() => showAddWallet = false} />
+{/if}
+
 <style>
   main {
     min-height: 100vh;
-    background: #0f172a;
-    color: #f1f5f9;
-  }
-
-  .dashboard {
-    padding: 1rem;
+    min-height: 100dvh;
+    background: var(--bg-primary);
     display: flex;
     flex-direction: column;
-    gap: 1rem;
   }
 
-  .positions h2, .trades h2 {
-    margin: 0 0 0.75rem 0;
-    font-size: 1rem;
-    color: #94a3b8;
+  .content {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
   }
 
-  .position-grid {
+  .positions-grid {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
   }
 
-  .loading, .no-positions {
+  .loading, .empty {
     text-align: center;
-    color: #64748b;
+    color: var(--text-secondary);
+    padding: 3rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     padding: 2rem;
+    text-align: center;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .empty-state h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+  }
+
+  .empty-state p {
+    color: var(--text-secondary);
+    margin: 0 0 1.5rem 0;
+  }
+
+  .primary-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer;
   }
 
   .settings-panel {
+    flex: 1;
     padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .settings-header {
     display: flex;
-    flex-direction: column;
-    gap: 1rem;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-header h2 {
+    margin: 0;
+    font-size: 1.125rem;
+  }
+
+  .close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+  }
+
+  .wallet-section {
+    background: var(--bg-card);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid var(--border);
+  }
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .section-header h3 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .add-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 0.875rem;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .no-wallets {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 1rem;
+    margin: 0;
   }
 
   .wallet-list {
-    background: #1e293b;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    border: 1px solid #334155;
-  }
-
-  .wallet-list h2 {
-    margin: 0 0 0.75rem 0;
-    font-size: 1rem;
-  }
-
-  .wallet-list ul {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -169,48 +262,29 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid #334155;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
   }
 
   .wallet-list li:last-child {
     border-bottom: none;
   }
 
+  .wallet-name {
+    font-size: 0.875rem;
+  }
+
   .remove-btn {
     background: transparent;
     border: none;
-    color: #f87171;
+    color: var(--red);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.875rem;
     padding: 0.25rem 0.5rem;
+    opacity: 0.7;
   }
 
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 4rem 2rem;
-    text-align: center;
-  }
-
-  .empty-state h2 {
-    margin: 0 0 0.5rem 0;
-  }
-
-  .empty-state p {
-    color: #64748b;
-    margin: 0 0 1.5rem 0;
-  }
-
-  .empty-state button {
-    background: #3b82f6;
-    color: white;
-    border: none;
-    border-radius: 0.375rem;
-    padding: 0.75rem 1.5rem;
-    font-weight: 500;
-    cursor: pointer;
+  .remove-btn:hover {
+    opacity: 1;
   }
 </style>
