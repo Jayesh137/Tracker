@@ -14,6 +14,11 @@
   $: isProfit = totalPnl > 0;
   $: isLoss = totalPnl < 0;
 
+  $: timestamps = fills.map(f => f.timestamp);
+  $: firstFillDate = Math.min(...timestamps);
+  $: lastFillDate = Math.max(...timestamps);
+  $: dateRange = formatDateRange(firstFillDate, lastFillDate);
+
   function formatPnl(pnl: number): string {
     if (pnl === 0) return '—';
     const prefix = pnl > 0 ? '+' : '';
@@ -24,6 +29,20 @@
     if (vol >= 1000) return vol.toLocaleString('en-US', { maximumFractionDigits: 1 });
     if (vol >= 1) return vol.toFixed(2);
     return vol.toFixed(4);
+  }
+
+  function formatDate(timestamp: number): string {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  function formatDateRange(first: number, last: number): string {
+    const firstStr = formatDate(first);
+    const lastStr = formatDate(last);
+    if (firstStr === lastStr) return lastStr;
+    return `${firstStr} - ${lastStr}`;
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -44,6 +63,7 @@
     <div class="main-info">
       <span class="coin">{coin}</span>
       <span class="count">{fills.length} fills</span>
+      <span class="date-range">{dateRange}</span>
     </div>
     <div class="stats">
       <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
@@ -109,6 +129,12 @@
   .count {
     font-size: 0.75rem;
     color: var(--text-secondary);
+  }
+
+  .date-range {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0.8;
   }
 
   .stats {
