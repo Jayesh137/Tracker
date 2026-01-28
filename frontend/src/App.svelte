@@ -20,6 +20,11 @@
   let showAddWallet = false;
   let showSettings = false;
   let refreshInterval: ReturnType<typeof setInterval>;
+  let positionSearch = '';
+
+  $: filteredPositions = $positions.filter(p =>
+    p.coin.toLowerCase().includes(positionSearch.toLowerCase())
+  );
 
   onMount(() => {
     loadWallets();
@@ -97,13 +102,24 @@
 
     <div class="content">
       {#if activeTab === 'positions'}
+        {#if $positions.length > 0}
+          <div class="search-bar">
+            <input
+              type="text"
+              placeholder="Search assets..."
+              bind:value={positionSearch}
+            />
+          </div>
+        {/if}
         {#if $positionsLoading}
           <p class="loading">Loading positions...</p>
         {:else if $positions.length === 0}
           <p class="empty">No open positions</p>
+        {:else if filteredPositions.length === 0}
+          <p class="empty">No positions match "{positionSearch}"</p>
         {:else}
           <div class="positions-grid">
-            {#each $positions as position (position.coin)}
+            {#each filteredPositions as position (position.coin)}
               <PositionCard {position} />
             {/each}
           </div>
@@ -137,6 +153,29 @@
     flex: 1;
     padding: 1rem;
     overflow-y: auto;
+  }
+
+  .search-bar {
+    margin-bottom: 1rem;
+  }
+
+  .search-bar input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+  }
+
+  .search-bar input::placeholder {
+    color: var(--text-secondary);
+  }
+
+  .search-bar input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   .positions-grid {
