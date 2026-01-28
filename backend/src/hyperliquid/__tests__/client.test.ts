@@ -15,16 +15,9 @@ describe('HyperliquidClient', () => {
   });
 
   describe('getTrades', () => {
-    it('should fetch recent trades for a wallet with pagination', async () => {
-      const result = await client.getTrades(TEST_WALLET);
-      expect(Array.isArray(result.trades)).toBe(true);
-      expect(typeof result.total).toBe('number');
-      expect(typeof result.hasMore).toBe('boolean');
-    });
-
-    it('should respect limit and offset parameters', async () => {
-      const result = await client.getTrades(TEST_WALLET, 10, 0);
-      expect(result.trades.length).toBeLessThanOrEqual(10);
+    it('should fetch all trades for a wallet', async () => {
+      const trades = await client.getTrades(TEST_WALLET);
+      expect(Array.isArray(trades)).toBe(true);
     });
   });
 

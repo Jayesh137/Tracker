@@ -30,11 +30,7 @@ export class HyperliquidClient {
       .map(ap => this.transformPosition(ap.position));
   }
 
-  async getTrades(
-    address: string,
-    limit: number = 50,
-    offset: number = 0
-  ): Promise<{ trades: Trade[]; total: number; hasMore: boolean }> {
+  async getTrades(address: string): Promise<Trade[]> {
     const response = await fetch(`${API_URL}/info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -49,14 +45,7 @@ export class HyperliquidClient {
     }
 
     const fills: HyperliquidFill[] = await response.json();
-    const total = fills.length;
-    const paginated = fills.slice(offset, offset + limit);
-
-    return {
-      trades: paginated.map(fill => this.transformFill(fill)),
-      total,
-      hasMore: offset + paginated.length < total
-    };
+    return fills.map(fill => this.transformFill(fill));
   }
 
   transformPosition(pos: HyperliquidPosition): Position {

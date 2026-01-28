@@ -34,9 +34,3 @@ export interface Wallet {
   address: string;
   name: string;
 }
-
-export interface TradesResponse {
-  trades: Trade[];
-  total: number;
-  hasMore: boolean;
-}

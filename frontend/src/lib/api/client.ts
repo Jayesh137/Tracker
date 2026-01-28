@@ -1,4 +1,4 @@
-import type { Position, TradesResponse, Wallet } from '../types';
+import type { Position, Trade, Wallet } from '../types';
 
 const API_BASE = '/api';
 
@@ -44,8 +44,8 @@ export const api = {
   getPositions: (address: string) =>
     fetchJson<Position[]>(`/wallet/${address}/positions`),
 
-  getTrades: (address: string, limit: number = 50, offset: number = 0) =>
-    fetchJson<TradesResponse>(`/wallet/${address}/trades?limit=${limit}&offset=${offset}`),
+  getTrades: (address: string) =>
+    fetchJson<Trade[]>(`/wallet/${address}/trades`),
 
   // Push notifications
   getVapidPublicKey: () =>

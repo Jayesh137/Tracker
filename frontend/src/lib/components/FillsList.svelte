@@ -3,9 +3,10 @@
   import type { Trade } from '../types';
 
   export let fills: Trade[] = [];
-  export let hasMore: boolean = false;
   export let loading: boolean = false;
-  export let onLoadMore: () => void = () => {};
+
+  const GROUPS_PER_PAGE = 10;
+  let visibleGroupCount = GROUPS_PER_PAGE;
 
   interface FillGroupData {
     coin: string;
@@ -13,7 +14,14 @@
     latestTimestamp: number;
   }
 
-  $: groups = groupFills(fills);
+  $: allGroups = groupFills(fills);
+  $: visibleGroups = allGroups.slice(0, visibleGroupCount);
+  $: hasMore = visibleGroupCount < allGroups.length;
+
+  // Reset visible count when fills change (new wallet selected)
+  $: if (fills) {
+    visibleGroupCount = GROUPS_PER_PAGE;
+  }
 
   function groupFills(fills: Trade[]): FillGroupData[] {
     const grouped = new Map<string, Trade[]>();
@@ -32,19 +40,23 @@
       }))
       .sort((a, b) => b.latestTimestamp - a.latestTimestamp);
   }
+
+  function loadMore() {
+    visibleGroupCount += GROUPS_PER_PAGE;
+  }
 </script>
 
 <div class="fills-list">
   {#if fills.length === 0 && !loading}
     <p class="empty">No fills</p>
   {:else}
-    {#each groups as group (group.coin)}
+    {#each visibleGroups as group (group.coin)}
       <FillGroup coin={group.coin} fills={group.fills} />
     {/each}
 
     {#if hasMore}
-      <button class="load-more" on:click={onLoadMore} disabled={loading}>
-        {loading ? 'Loading...' : 'Load More'}
+      <button class="load-more" on:click={loadMore}>
+        Load More ({allGroups.length - visibleGroupCount} more assets)
       </button>
     {/if}
   {/if}
@@ -77,10 +89,5 @@
 
   .load-more:hover {
     background: var(--bg-primary);
-  }
-
-  .load-more:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 </style>
