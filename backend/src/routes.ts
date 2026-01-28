@@ -85,8 +85,8 @@ export function createRoutes(
     const { address } = req.params;
 
     try {
-      const positions = await hlClient.getPositions(address);
-      res.json(positions);
+      const data = await hlClient.getPositions(address);
+      res.json(data);
     } catch (error: any) {
       console.error('Failed to fetch positions:', error.message);
       res.status(500).json({ error: 'Failed to fetch positions' });

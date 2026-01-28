@@ -42,6 +42,17 @@ export interface HyperliquidClearinghouseState {
 }
 
 // App types
+export interface AccountSummary {
+  accountValue: number;
+  totalMarginUsed: number;
+  availableBalance: number;
+}
+
+export interface PositionsResponse {
+  positions: Position[];
+  account: AccountSummary;
+}
+
 export interface Position {
   coin: string;
   size: number;

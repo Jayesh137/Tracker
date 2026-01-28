@@ -1,4 +1,4 @@
-import type { Position, Trade, Wallet } from '../types';
+import type { PositionsResponse, Trade, Wallet } from '../types';
 
 const API_BASE = '/api';
 
@@ -42,7 +42,7 @@ export const api = {
 
   // Wallet data
   getPositions: (address: string) =>
-    fetchJson<Position[]>(`/wallet/${address}/positions`),
+    fetchJson<PositionsResponse>(`/wallet/${address}/positions`),
 
   getTrades: (address: string) =>
     fetchJson<Trade[]>(`/wallet/${address}/trades`),

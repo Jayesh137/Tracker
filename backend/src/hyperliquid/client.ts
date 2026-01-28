@@ -3,13 +3,15 @@ import type {
   HyperliquidFill,
   HyperliquidPosition,
   Position,
+  PositionsResponse,
+  AccountSummary,
   Trade
 } from '../types/index.js';
 
 const API_URL = 'https://api.hyperliquid.xyz';
 
 export class HyperliquidClient {
-  async getPositions(address: string): Promise<Position[]> {
+  async getPositions(address: string): Promise<PositionsResponse> {
     // Fetch from both default perp DEX and xyz DEX (spot perps)
     const [defaultResponse, xyzResponse] = await Promise.all([
       fetch(`${API_URL}/info`, {
@@ -40,6 +42,15 @@ export class HyperliquidClient {
       .filter(ap => parseFloat(ap.position.szi) !== 0)
       .map(ap => this.transformPosition(ap.position));
 
+    // Extract account summary from default perp DEX
+    const accountValue = parseFloat(defaultData.marginSummary.accountValue);
+    const totalMarginUsed = parseFloat(defaultData.marginSummary.totalMarginUsed);
+    const account: AccountSummary = {
+      accountValue,
+      totalMarginUsed,
+      availableBalance: accountValue - totalMarginUsed
+    };
+
     // xyz DEX might not exist for all wallets, so handle gracefully
     let xyzPositions: Position[] = [];
     if (xyzResponse.ok) {
@@ -49,9 +60,18 @@ export class HyperliquidClient {
           .filter(ap => parseFloat(ap.position.szi) !== 0)
           .map(ap => this.transformPosition(ap.position));
       }
+      // Add xyz account value to total
+      if (xyzData.marginSummary) {
+        account.accountValue += parseFloat(xyzData.marginSummary.accountValue);
+        account.totalMarginUsed += parseFloat(xyzData.marginSummary.totalMarginUsed);
+        account.availableBalance = account.accountValue - account.totalMarginUsed;
+      }
     }
 
-    return [...defaultPositions, ...xyzPositions];
+    return {
+      positions: [...defaultPositions, ...xyzPositions],
+      account
+    };
   }
 
   async getTrades(address: string): Promise<Trade[]> {

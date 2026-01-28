@@ -10,6 +10,17 @@ export interface Position {
   marginUsed: number;
 }
 
+export interface AccountSummary {
+  accountValue: number;
+  totalMarginUsed: number;
+  availableBalance: number;
+}
+
+export interface PositionsResponse {
+  positions: Position[];
+  account: AccountSummary;
+}
+
 export interface Trade {
   id: string;
   coin: string;

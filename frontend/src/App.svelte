@@ -13,7 +13,8 @@
     removeWallet,
     hasWallets
   } from './lib/stores/wallets';
-  import { positions, positionsLoading, loadPositions } from './lib/stores/positions';
+  import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
+import AccountBalance from './lib/components/AccountBalance.svelte';
   import { trades, tradesLoading, loadTrades } from './lib/stores/trades';
 
   let activeTab: 'positions' | 'fills' = 'positions';
@@ -99,6 +100,7 @@
 
   {:else}
     <TabBar bind:activeTab />
+    <AccountBalance account={$accountSummary} />
 
     <div class="content">
       {#if activeTab === 'positions'}
