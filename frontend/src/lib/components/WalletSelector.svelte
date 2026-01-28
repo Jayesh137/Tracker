@@ -1,15 +1,26 @@
 <script lang="ts">
   import { wallets, selectedWallet } from '../stores/wallets';
+  import type { Wallet } from '../types';
 
-  function shortenAddress(addr: string): string {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  function getWalletDisplayName(wallet: Wallet): string {
+    if (wallet.name) return wallet.name;
+    return `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
+  }
+
+  function handleChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    const address = select.value;
+    const wallet = $wallets.find(w => w.address === address);
+    if (wallet) {
+      $selectedWallet = wallet;
+    }
   }
 </script>
 
 {#if $wallets.length > 0}
-  <select bind:value={$selectedWallet}>
+  <select value={$selectedWallet?.address || ''} on:change={handleChange}>
     {#each $wallets as wallet}
-      <option value={wallet}>{shortenAddress(wallet)}</option>
+      <option value={wallet.address}>{getWalletDisplayName(wallet)}</option>
     {/each}
   </select>
 {/if}

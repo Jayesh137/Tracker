@@ -1,4 +1,4 @@
-import type { Position, Trade } from '../types';
+import type { Position, Trade, Wallet } from '../types';
 
 const API_BASE = '/api';
 
@@ -21,17 +21,23 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Wallets
-  getWallets: () => fetchJson<string[]>('/wallets'),
+  getWallets: () => fetchJson<Wallet[]>('/wallets'),
 
-  addWallet: (address: string) =>
-    fetchJson<{ success: boolean; address: string }>('/wallets', {
+  addWallet: (address: string, name: string) =>
+    fetchJson<{ success: boolean; wallet: Wallet }>('/wallets', {
       method: 'POST',
-      body: JSON.stringify({ address })
+      body: JSON.stringify({ address, name })
     }),
 
   removeWallet: (address: string) =>
     fetchJson<{ success: boolean }>(`/wallets/${address}`, {
       method: 'DELETE'
+    }),
+
+  renameWallet: (address: string, name: string) =>
+    fetchJson<{ success: boolean }>(`/wallets/${address}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name })
     }),
 
   // Wallet data

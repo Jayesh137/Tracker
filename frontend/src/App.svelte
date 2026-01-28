@@ -24,8 +24,8 @@
     // Auto-refresh every 30 seconds
     refreshInterval = setInterval(() => {
       if ($selectedWallet) {
-        loadPositions($selectedWallet);
-        loadTrades($selectedWallet);
+        loadPositions($selectedWallet.address);
+        loadTrades($selectedWallet.address);
       }
     }, 30000);
 
@@ -34,8 +34,8 @@
 
   // Load data when selected wallet changes
   $: if ($selectedWallet) {
-    loadPositions($selectedWallet);
-    loadTrades($selectedWallet);
+    loadPositions($selectedWallet.address);
+    loadTrades($selectedWallet.address);
   }
 
   function handleRemoveWallet(address: string) {
@@ -44,8 +44,9 @@
     }
   }
 
-  function shortenAddress(addr: string): string {
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  function getWalletDisplayName(wallet: { address: string; name: string }): string {
+    if (wallet.name) return wallet.name;
+    return `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
   }
 </script>
 
@@ -63,8 +64,8 @@
           <ul>
             {#each $wallets as wallet}
               <li>
-                <span>{shortenAddress(wallet)}</span>
-                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet)}>
+                <span>{getWalletDisplayName(wallet)}</span>
+                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet.address)}>
                   ✕
                 </button>
               </li>

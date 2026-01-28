@@ -2,15 +2,17 @@
   import { addWallet, wallets, error } from '../stores/wallets';
 
   let address = '';
+  let name = '';
   let isAdding = false;
 
   async function handleSubmit() {
     if (!address.trim()) return;
 
     isAdding = true;
-    const success = await addWallet(address.trim());
+    const success = await addWallet(address.trim(), name.trim());
     if (success) {
       address = '';
+      name = '';
     }
     isAdding = false;
   }
@@ -25,6 +27,12 @@
     <p class="limit">Maximum 3 wallets reached</p>
   {:else}
     <form on:submit|preventDefault={handleSubmit}>
+      <input
+        type="text"
+        bind:value={name}
+        placeholder="Wallet name (optional)"
+        disabled={isAdding}
+      />
       <input
         type="text"
         bind:value={address}
@@ -58,6 +66,7 @@
 
   form {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
   }
 
