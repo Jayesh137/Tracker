@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 async function main() {
   // Initialize storage
@@ -100,7 +101,7 @@ async function main() {
   });
 
   // Start server
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Server] Running on port ${PORT}`);
   });
 
@@ -115,9 +116,27 @@ async function main() {
   }
 
   // Keep-alive ping (prevents Render free tier from sleeping)
-  setInterval(() => {
-    fetch(`http://localhost:${PORT}/api/health`).catch(() => {});
-  }, 10 * 60 * 1000); // Every 10 minutes
+  const keepAliveInterval = setInterval(() => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    fetch(`http://localhost:${PORT}/api/health`, { signal: controller.signal })
+      .catch(() => {})
+      .finally(() => clearTimeout(timeout));
+  }, KEEP_ALIVE_INTERVAL_MS);
+
+  // Graceful shutdown
+  process.on('SIGTERM', () => {
+    console.log('[Server] SIGTERM received, shutting down gracefully...');
+    hlWebSocket.close();
+    clearInterval(keepAliveInterval);
+    server.close(() => {
+      console.log('[Server] Closed');
+      process.exit(0);
+    });
+  });
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error('[Main] Fatal error:', error);
+  process.exit(1);
+});
