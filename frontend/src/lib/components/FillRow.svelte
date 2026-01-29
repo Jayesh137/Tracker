@@ -51,11 +51,6 @@
       {actionText}
     </span>
     <span class="fill-value">{formatFillValue(fill.size, fill.price)}</span>
-    {#if hasPnl}
-      <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
-        {formatPnl(fill.closedPnl)}
-      </span>
-    {/if}
     <span class="chevron">{expanded ? '▲' : '▼'}</span>
   </div>
 
@@ -73,6 +68,12 @@
         <span class="label">Fee</span>
         <span class="value fee">-${fill.fee.toFixed(2)}</span>
       </div>
+      {#if hasPnl}
+        <div class="detail-row">
+          <span class="label">PnL</span>
+          <span class="value" class:profit={isProfit} class:loss={isLoss}>{formatPnl(fill.closedPnl)}</span>
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
@@ -187,6 +188,14 @@
   }
 
   .value.fee {
+    color: var(--red);
+  }
+
+  .value.profit {
+    color: var(--green);
+  }
+
+  .value.loss {
     color: var(--red);
   }
 </style>
