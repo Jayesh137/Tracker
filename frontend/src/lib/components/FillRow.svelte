@@ -11,6 +11,7 @@
   $: isClose = fill.direction?.includes('Close') ?? false;
   $: isProfit = (fill.closedPnl ?? 0) > 0;
   $: isLoss = (fill.closedPnl ?? 0) < 0;
+  $: hasPnl = fill.closedPnl !== null && fill.closedPnl !== 0;
 
   // Display text: "Open Long", "Close Short", or fallback to BUY/SELL
   $: actionText = fill.direction || (fill.side === 'buy' ? 'BUY' : 'SELL');
@@ -30,9 +31,15 @@
   }
 
   function formatPnl(pnl: number | null): string {
-    if (pnl === null || pnl === 0) return '—';
+    if (pnl === null || pnl === 0) return '';
     const prefix = pnl > 0 ? '+' : '';
     return prefix + formatPrice(pnl);
+  }
+
+  function formatFillValue(size: number, price: number): string {
+    const value = size * price;
+    if (value >= 1000) return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '$' + value.toFixed(2);
   }
 </script>
 
@@ -43,9 +50,12 @@
     <span class="action" class:long={isLongPosition} class:short={isShortPosition}>
       {actionText}
     </span>
-    <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
-      {formatPnl(fill.closedPnl)}
-    </span>
+    <span class="fill-value">{formatFillValue(fill.size, fill.price)}</span>
+    {#if hasPnl}
+      <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
+        {formatPnl(fill.closedPnl)}
+      </span>
+    {/if}
     <span class="chevron">{expanded ? '▲' : '▼'}</span>
   </div>
 
@@ -106,8 +116,7 @@
     font-size: 0.65rem;
     font-weight: 600;
     padding: 0.15rem 0.4rem;
-    border-radius: 0.2rem;
-    flex: 1;
+    border-radius: 4px;
   }
 
   .action.long {
@@ -120,19 +129,31 @@
     color: var(--red);
   }
 
-  .pnl {
+  .fill-value {
     font-size: 0.875rem;
     font-weight: 500;
-    min-width: 70px;
+    color: var(--text-primary);
+    min-width: 60px;
+    text-align: right;
+    margin-left: auto;
+  }
+
+  .pnl {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
     text-align: right;
   }
 
   .pnl.profit {
     color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
   }
 
   .pnl.loss {
     color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
   }
 
   .chevron {
