@@ -3,8 +3,16 @@ import type { Store, PushSubscription, Wallet } from '../types/index.js';
 
 const STORE_KEY = 'hl-tracker:store';
 
+const DEFAULT_WALLETS: Wallet[] = [
+  { address: '0x45d26f28196d226497130c4bac709d808fed4029', name: 'Ezekiel' },
+  { address: '0x418aa6bf98a2b2bc93779f810330d88cde488888', name: '518' },
+  { address: '0x94d3735543ecb3d339064151118644501c933814', name: 'Dash' },
+  { address: '0x0ddf9bae2af4b874b96d287a5ad42eb47138a902', name: 'Pension' },
+  { address: '0x8def9f50456c6c4e37fa5d3d57f108ed23992dae', name: 'Loracle' },
+];
+
 const DEFAULT_STORE: Store = {
-  wallets: [],
+  wallets: DEFAULT_WALLETS,
   pushSubscriptions: [],
   settings: {
     notificationsEnabled: true
@@ -43,7 +51,7 @@ export class RedisStorage {
         }
 
         this.store = {
-          wallets,
+          wallets: wallets.length > 0 ? wallets : DEFAULT_WALLETS,
           pushSubscriptions: data.pushSubscriptions || [],
           settings: { ...DEFAULT_STORE.settings, ...data.settings }
         };
