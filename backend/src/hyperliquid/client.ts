@@ -11,11 +11,16 @@ import type {
 const API_URL = 'https://api.hyperliquid.xyz';
 
 export class HyperliquidClient {
-  async getAllMids(): Promise<Record<string, string>> {
+  async getAllMids(dex?: string): Promise<Record<string, string>> {
+    const body: Record<string, string> = { type: 'allMids' };
+    if (dex) {
+      body.dex = dex;
+    }
+
     const response = await fetch(`${API_URL}/info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'allMids' })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
@@ -26,8 +31,8 @@ export class HyperliquidClient {
   }
 
   async getPositions(address: string): Promise<PositionsResponse> {
-    // Fetch positions and current prices in parallel
-    const [defaultResponse, xyzResponse, mids] = await Promise.all([
+    // Fetch positions and current prices in parallel (both default and xyz DEX)
+    const [defaultResponse, xyzResponse, defaultMids, xyzMids] = await Promise.all([
       fetch(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,8 +50,12 @@ export class HyperliquidClient {
           dex: 'xyz'
         })
       }),
-      this.getAllMids()
+      this.getAllMids(),
+      this.getAllMids('xyz')
     ]);
+
+    // Merge mids from both DEXes
+    const mids = { ...defaultMids, ...xyzMids };
 
     if (!defaultResponse.ok) {
       throw new Error(`Hyperliquid API error: ${defaultResponse.status}`);
