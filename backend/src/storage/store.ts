@@ -62,7 +62,7 @@ export class Storage {
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         this.store = {
-          wallets: [],
+          wallets: DEFAULT_WALLETS,
           pushSubscriptions: [],
           settings: { ...DEFAULT_STORE.settings }
         };

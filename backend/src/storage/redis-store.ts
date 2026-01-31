@@ -56,12 +56,12 @@ export class RedisStorage {
           settings: { ...DEFAULT_STORE.settings, ...data.settings }
         };
       } else {
-        this.store = { ...DEFAULT_STORE, wallets: [], pushSubscriptions: [] };
+        this.store = { ...DEFAULT_STORE, wallets: DEFAULT_WALLETS, pushSubscriptions: [] };
         await this.save();
       }
     } catch (error) {
       console.error('[RedisStorage] Failed to load:', error);
-      this.store = { ...DEFAULT_STORE, wallets: [], pushSubscriptions: [] };
+      this.store = { ...DEFAULT_STORE, wallets: DEFAULT_WALLETS, pushSubscriptions: [] };
     }
   }
 
