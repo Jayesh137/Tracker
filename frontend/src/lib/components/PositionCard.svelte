@@ -25,6 +25,10 @@
     if (num >= 1000) return '$' + (num / 1000).toFixed(1) + 'K';
     return formatPrice(num);
   }
+
+  function formatPnl(num: number): string {
+    return '$' + Math.abs(num).toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
 </script>
 
 <div class="position-card" class:long={isLong} class:short={!isLong}>
@@ -57,8 +61,8 @@
 
   <div class="bottom-row">
     <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
-      <span class="pnl-amount">{isProfit ? '+' : ''}{formatPrice(position.unrealizedPnl)}</span>
-      <span class="pnl-pct">{isProfit ? '+' : ''}{formatNumber(position.unrealizedPnlPercent)}%</span>
+      <span class="pnl-amount">{isProfit ? '+' : '-'}{formatPnl(position.unrealizedPnl)}</span>
+      <span class="pnl-pct">{isProfit ? '+' : ''}{Math.round(position.unrealizedPnlPercent)}%</span>
     </div>
     <div class="meta">
       <span class="meta-item">
