@@ -73,14 +73,17 @@
       {#if primaryDirection}
         <span class="direction-badge" class:long={isLong} class:short={isShort}>{primaryDirection}</span>
       {/if}
+      <span class="spacer"></span>
       <span class="date">{dateRange}</span>
       <span class="chevron">{expanded ? '▲' : '▼'}</span>
     </div>
     <div class="row-bottom">
       <span class="stat">{fills.length} fills</span>
+      <span class="stat-sep">·</span>
       <span class="stat">{formatVolume(totalVolume)}</span>
-      <span class="stat buys">{buyCount} buys</span>
-      <span class="stat sells">{sellCount} sells</span>
+      <span class="stat-sep">·</span>
+      <span class="stat buys">{buyCount}B</span>
+      <span class="stat sells">{sellCount}S</span>
       {#if totalPnl !== 0}
         <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
           {formatPnl(totalPnl)}
@@ -111,8 +114,8 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 14px 16px;
+    gap: 6px;
+    padding: 12px 14px;
     background: transparent;
     border: none;
     color: var(--text-primary);
@@ -127,19 +130,19 @@
   .row-top {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
   }
 
   .coin {
     font-weight: 700;
-    font-size: 17px;
+    font-size: 16px;
     letter-spacing: -0.01em;
   }
 
   .direction-badge {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
-    padding: 3px 8px;
+    padding: 2px 6px;
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -155,27 +158,36 @@
     background: rgba(239, 68, 68, 0.12);
   }
 
+  .spacer {
+    flex: 1;
+  }
+
   .date {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
-    margin-left: auto;
   }
 
   .chevron {
     font-size: 10px;
     color: var(--text-secondary);
+    margin-left: 4px;
   }
 
   .row-bottom {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 6px;
   }
 
   .stat {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
+  }
+
+  .stat-sep {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.5;
   }
 
   .stat.buys { color: var(--green); }
@@ -184,9 +196,9 @@
   .pnl {
     margin-left: auto;
     font-weight: 600;
-    font-size: 14px;
-    padding: 4px 10px;
-    border-radius: 6px;
+    font-size: 13px;
+    padding: 3px 8px;
+    border-radius: 5px;
   }
 
   .pnl.profit {
