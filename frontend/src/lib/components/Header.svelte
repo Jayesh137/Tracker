@@ -6,26 +6,7 @@
 </script>
 
 <header>
-  <div class="logo">
-    <svg width="28" height="28" viewBox="0 0 512 512">
-      <defs>
-        <linearGradient id="logoGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" style="stop-color:#3b82f6"/>
-          <stop offset="100%" style="stop-color:#06b6d4"/>
-        </linearGradient>
-      </defs>
-      <rect width="512" height="512" rx="96" fill="#0a0f1a"/>
-      <g fill="url(#logoGrad)">
-        <rect x="80" y="140" width="40" height="232" rx="8"/>
-        <rect x="200" y="140" width="40" height="232" rx="8"/>
-        <rect x="80" y="236" width="160" height="40" rx="8"/>
-        <rect x="280" y="140" width="40" height="232" rx="8"/>
-        <rect x="280" y="332" width="152" height="40" rx="8"/>
-      </g>
-      <path d="M60 320 L140 280 L220 300 L300 200 L380 240 L460 120" fill="none" stroke="#22c55e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-    </svg>
-    <span class="logo-text">HL Tracker</span>
-  </div>
+  <span class="logo">HL Tracker</span>
   <WalletDropdown {onAddWallet} />
   <button class="settings" on:click={onOpenSettings} aria-label="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -46,22 +27,9 @@
   }
 
   .logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .logo svg {
-    border-radius: 6px;
-  }
-
-  .logo-text {
     font-weight: 700;
     font-size: 1rem;
-    background: linear-gradient(135deg, #3b82f6, #06b6d4);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--text-primary);
   }
 
   .settings {
