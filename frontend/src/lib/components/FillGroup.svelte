@@ -60,21 +60,21 @@
     on:keydown={handleKeydown}
     aria-expanded={expanded}
   >
-    <div class="header-left">
+    <div class="row-top">
       <span class="coin">{coin}</span>
+      <span class="date">{dateRange}</span>
+      <span class="chevron">{expanded ? '▲' : '▼'}</span>
+    </div>
+    <div class="row-bottom">
+      <span class="stat">{fills.length} fills</span>
+      <span class="stat">{formatVolume(totalVolume)} vol</span>
+      <span class="stat buys">{buyCount} buys</span>
+      <span class="stat sells">{sellCount} sells</span>
       {#if totalPnl !== 0}
         <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
           {formatPnl(totalPnl)}
         </span>
       {/if}
-    </div>
-    <span class="chevron">{expanded ? '▲' : '▼'}</span>
-    <div class="meta-row">
-      <span class="meta">{fills.length} fills · {dateRange} · {formatVolume(totalVolume)} vol</span>
-      <span class="trades">
-        <span class="buys">{buyCount}B</span>
-        <span class="sells">{sellCount}S</span>
-      </span>
     </div>
   </button>
 
@@ -90,19 +90,18 @@
 <style>
   .fill-group {
     background: var(--bg-card);
-    border-radius: 0.75rem;
+    border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--border);
-    margin-bottom: 0.75rem;
+    margin-bottom: 10px;
   }
 
   .group-header {
     width: 100%;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    gap: 0.375rem 0.5rem;
-    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
     background: transparent;
     border: none;
     color: var(--text-primary);
@@ -114,52 +113,61 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .header-left {
+  .row-top {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: 12px;
   }
 
   .coin {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 17px;
+    letter-spacing: -0.01em;
   }
 
-  .pnl {
-    font-weight: 600;
-    font-size: 0.875rem;
+  .date {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-left: auto;
   }
-
-  .pnl.profit { color: var(--green); }
-  .pnl.loss { color: var(--red); }
 
   .chevron {
-    font-size: 0.625rem;
+    font-size: 10px;
     color: var(--text-secondary);
-    align-self: center;
   }
 
-  .meta-row {
-    grid-column: 1 / -1;
+  .row-bottom {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 
-  .meta {
-    font-size: 0.75rem;
+  .stat {
+    font-size: 13px;
     color: var(--text-secondary);
   }
 
-  .trades {
-    display: flex;
-    gap: 0.375rem;
-    font-size: 0.75rem;
-    font-weight: 500;
+  .stat.buys { color: var(--green); }
+  .stat.sells { color: var(--red); }
+
+  .pnl {
+    margin-left: auto;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 4px 10px;
+    border-radius: 6px;
   }
 
-  .buys { color: var(--green); }
-  .sells { color: var(--red); }
+  .pnl.profit {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
+  }
+
+  .pnl.loss {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
+  }
 
   .fills {
     border-top: 1px solid var(--border);
