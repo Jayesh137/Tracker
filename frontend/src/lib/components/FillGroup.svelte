@@ -21,8 +21,8 @@
 
   function formatPnl(pnl: number): string {
     if (pnl === 0) return '—';
-    const prefix = pnl > 0 ? '+' : '';
-    return prefix + '$' + Math.abs(pnl).toFixed(2);
+    const prefix = pnl > 0 ? '+' : '-';
+    return prefix + '$' + Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
 
   function formatVolume(vol: number): string {
