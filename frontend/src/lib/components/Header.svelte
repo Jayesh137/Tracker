@@ -6,7 +6,7 @@
 </script>
 
 <header>
-  <span class="logo">HL Tracker</span>
+  <img src="/icons/hyperliquid-logo.png" alt="Hyperliquid" class="logo" />
   <WalletDropdown {onAddWallet} />
   <button class="settings" on:click={onOpenSettings} aria-label="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -27,9 +27,8 @@
   }
 
   .logo {
-    font-weight: 700;
-    font-size: 1rem;
-    color: var(--text-primary);
+    height: 28px;
+    width: auto;
   }
 
   .settings {
