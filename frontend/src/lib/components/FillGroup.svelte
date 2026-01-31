@@ -67,7 +67,7 @@
     </div>
     <div class="row-bottom">
       <span class="stat">{fills.length} fills</span>
-      <span class="stat">{formatVolume(totalVolume)} vol</span>
+      <span class="stat">{formatVolume(totalVolume)}</span>
       <span class="stat buys">{buyCount} buys</span>
       <span class="stat sells">{sellCount} sells</span>
       {#if totalPnl !== 0}
