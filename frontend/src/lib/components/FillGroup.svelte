@@ -60,22 +60,21 @@
     on:keydown={handleKeydown}
     aria-expanded={expanded}
   >
-    <div class="main-info">
+    <div class="row-1">
       <span class="coin">{coin}</span>
-      <span class="count">{fills.length} fills</span>
-      <span class="date-range">{dateRange}</span>
+      <span class="meta">{fills.length} fills · {dateRange}</span>
+      <span class="chevron">{expanded ? '▲' : '▼'}</span>
     </div>
-    <div class="stats">
+    <div class="row-2">
       <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
         {formatPnl(totalPnl)}
       </span>
       <span class="volume">{formatVolume(totalVolume)} {coin}</span>
+      <span class="direction">
+        <span class="buys">{buyCount}B</span>
+        <span class="sells">{sellCount}S</span>
+      </span>
     </div>
-    <div class="direction">
-      <span class="buys">{buyCount} buys</span>
-      <span class="sells">{sellCount} sells</span>
-    </div>
-    <span class="chevron">{expanded ? '▲' : '▼'}</span>
   </button>
 
   {#if expanded}
@@ -99,10 +98,9 @@
   .group-header {
     width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
+    flex-direction: column;
     gap: 0.5rem;
-    padding: 1rem;
+    padding: 0.875rem 1rem;
     background: transparent;
     border: none;
     color: var(--text-primary);
@@ -114,11 +112,16 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .main-info {
+  .row-1 {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    min-width: 120px;
+  }
+
+  .row-2 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .coin {
@@ -126,22 +129,15 @@
     font-size: 1rem;
   }
 
-  .count {
+  .meta {
     font-size: 0.75rem;
     color: var(--text-secondary);
   }
 
-  .date-range {
-    font-size: 0.7rem;
+  .chevron {
+    font-size: 0.625rem;
     color: var(--text-secondary);
-    opacity: 0.8;
-  }
-
-  .stats {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
+    margin-left: auto;
   }
 
   .pnl {
@@ -159,18 +155,13 @@
 
   .direction {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.375rem;
     font-size: 0.75rem;
+    margin-left: auto;
   }
 
   .buys { color: var(--green); }
   .sells { color: var(--red); }
-
-  .chevron {
-    font-size: 0.625rem;
-    color: var(--text-secondary);
-    margin-left: auto;
-  }
 
   .fills {
     border-top: 1px solid var(--border);
