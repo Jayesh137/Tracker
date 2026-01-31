@@ -66,10 +66,10 @@
       <span class="chevron">{expanded ? '▲' : '▼'}</span>
     </div>
     <div class="row-2">
-      <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
+      <span class="pnl" class:profit={isProfit} class:loss={isLoss} class:neutral={totalPnl === 0}>
         {formatPnl(totalPnl)}
       </span>
-      <span class="volume">{formatVolume(totalVolume)} {coin}</span>
+      <span class="volume">{formatVolume(totalVolume)}</span>
       <span class="direction">
         <span class="buys">{buyCount}B</span>
         <span class="sells">{sellCount}S</span>
@@ -119,7 +119,8 @@
   }
 
   .row-2 {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
     gap: 0.75rem;
   }
@@ -147,17 +148,18 @@
 
   .pnl.profit { color: var(--green); }
   .pnl.loss { color: var(--red); }
+  .pnl.neutral { color: var(--text-secondary); }
 
   .volume {
     font-size: 0.75rem;
     color: var(--text-secondary);
+    text-align: right;
   }
 
   .direction {
     display: flex;
     gap: 0.375rem;
     font-size: 0.75rem;
-    margin-left: auto;
   }
 
   .buys { color: var(--green); }
