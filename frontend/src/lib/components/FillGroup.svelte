@@ -60,20 +60,30 @@
     on:keydown={handleKeydown}
     aria-expanded={expanded}
   >
-    <div class="row-1">
-      <span class="coin">{coin}</span>
-      <span class="meta">{fills.length} fills · {dateRange}</span>
-      <span class="chevron">{expanded ? '▲' : '▼'}</span>
+    <div class="top-row">
+      <div class="coin-info">
+        <span class="coin">{coin}</span>
+        <span class="badge">{fills.length} fills</span>
+      </div>
+      <div class="date-chevron">
+        <span class="date">{dateRange}</span>
+        <span class="chevron">{expanded ? '▲' : '▼'}</span>
+      </div>
     </div>
-    <div class="row-2">
-      <span class="pnl" class:profit={isProfit} class:loss={isLoss} class:neutral={totalPnl === 0}>
-        {formatPnl(totalPnl)}
-      </span>
-      <span class="volume">{formatVolume(totalVolume)}</span>
-      <span class="direction">
-        <span class="buys">{buyCount}B</span>
-        <span class="sells">{sellCount}S</span>
-      </span>
+    <div class="bottom-row">
+      <div class="volume-info">
+        <span class="volume-value">{formatVolume(totalVolume)}</span>
+        <span class="volume-label">volume</span>
+      </div>
+      <div class="trade-counts">
+        <span class="buys">{buyCount} buys</span>
+        <span class="sells">{sellCount} sells</span>
+      </div>
+      {#if totalPnl !== 0}
+        <div class="pnl-badge" class:profit={isProfit} class:loss={isLoss}>
+          {formatPnl(totalPnl)}
+        </div>
+      {/if}
     </div>
   </button>
 
@@ -99,8 +109,8 @@
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    padding: 0.875rem 1rem;
+    gap: 0.75rem;
+    padding: 1rem;
     background: transparent;
     border: none;
     color: var(--text-primary);
@@ -112,25 +122,39 @@
     background: rgba(255, 255, 255, 0.02);
   }
 
-  .row-1 {
+  .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .coin-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
 
-  .row-2 {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
   .coin {
-    font-weight: 600;
-    font-size: 1rem;
+    font-weight: 700;
+    font-size: 1.125rem;
   }
 
-  .meta {
+  .badge {
+    font-size: 0.625rem;
+    font-weight: 500;
+    padding: 0.2rem 0.4rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: var(--text-secondary);
+  }
+
+  .date-chevron {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .date {
     font-size: 0.75rem;
     color: var(--text-secondary);
   }
@@ -138,32 +162,57 @@
   .chevron {
     font-size: 0.625rem;
     color: var(--text-secondary);
-    margin-left: auto;
   }
 
-  .pnl {
-    font-weight: 600;
-    font-size: 0.875rem;
-  }
-
-  .pnl.profit { color: var(--green); }
-  .pnl.loss { color: var(--red); }
-  .pnl.neutral { color: var(--text-secondary); }
-
-  .volume {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-align: right;
-  }
-
-  .direction {
+  .bottom-row {
     display: flex;
-    gap: 0.375rem;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .volume-info {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+  }
+
+  .volume-value {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .volume-label {
+    font-size: 0.625rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .trade-counts {
+    display: flex;
+    gap: 0.5rem;
     font-size: 0.75rem;
   }
 
   .buys { color: var(--green); }
   .sells { color: var(--red); }
+
+  .pnl-badge {
+    margin-left: auto;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+  }
+
+  .pnl-badge.profit {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
+  }
+
+  .pnl-badge.loss {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
+  }
 
   .fills {
     border-top: 1px solid var(--border);
