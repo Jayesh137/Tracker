@@ -23,9 +23,9 @@ import AccountBalance from './lib/components/AccountBalance.svelte';
   let refreshInterval: ReturnType<typeof setInterval>;
   let positionSearch = '';
 
-  $: filteredPositions = $positions.filter(p =>
-    p.coin.toLowerCase().includes(positionSearch.toLowerCase())
-  );
+  $: filteredPositions = $positions
+    .filter(p => p.coin.toLowerCase().includes(positionSearch.toLowerCase()))
+    .sort((a, b) => (b.size * b.currentPrice) - (a.size * a.currentPrice));
 
   onMount(() => {
     loadWallets();

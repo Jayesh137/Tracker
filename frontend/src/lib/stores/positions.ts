@@ -13,12 +13,9 @@ export async function loadPositions(address: string) {
 
   try {
     const data = await api.getPositions(address);
-    console.log('[Positions] Loaded:', data.positions.length, 'positions');
-    console.log('[Positions] Coins:', data.positions.map(p => p.coin));
     positions.set(data.positions);
     accountSummary.set(data.account);
   } catch (e: any) {
-    console.error('[Positions] Error:', e.message);
     positionsError.set(e.message);
   } finally {
     positionsLoading.set(false);
