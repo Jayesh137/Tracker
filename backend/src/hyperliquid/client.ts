@@ -98,14 +98,24 @@ export class HyperliquidClient {
     };
   }
 
-  async getTrades(address: string): Promise<Trade[]> {
+  async getTrades(address: string, startTime?: number, endTime?: number): Promise<Trade[]> {
+    // Use userFillsByTime for time-filtered queries, otherwise userFills
+    const body: Record<string, any> = startTime
+      ? {
+          type: 'userFillsByTime',
+          user: address,
+          startTime,
+          endTime: endTime || Date.now()
+        }
+      : {
+          type: 'userFills',
+          user: address
+        };
+
     const response = await fetch(`${API_URL}/info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'userFills',
-        user: address
-      })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {

@@ -92,12 +92,15 @@ export function createRoutes(
     }
   });
 
-  // Get all trades for wallet
+  // Get trades for wallet (supports time range filtering)
   router.get('/wallet/:address/trades', async (req: Request, res: Response) => {
     const { address } = req.params;
+    const { startTime, endTime } = req.query;
 
     try {
-      const trades = await hlClient.getTrades(address);
+      const start = startTime ? parseInt(startTime as string) : undefined;
+      const end = endTime ? parseInt(endTime as string) : undefined;
+      const trades = await hlClient.getTrades(address, start, end);
       res.json(trades);
     } catch (error: any) {
       console.error('Failed to fetch trades:', error.message);
