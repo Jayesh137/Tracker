@@ -6,8 +6,7 @@
   export let fills: Trade[] = [];
   export let loading: boolean = false;
 
-  const GROUPS_PER_PAGE = 10;
-  let visibleGroupCount = GROUPS_PER_PAGE;
+  let visibleGroupCount = 999; // Show all groups by default
 
   interface FillGroupData {
     coin: string;
@@ -17,12 +16,6 @@
 
   $: allGroups = groupFills(fills);
   $: visibleGroups = allGroups.slice(0, visibleGroupCount);
-  $: hasMoreGroups = visibleGroupCount < allGroups.length;
-
-  // Reset visible count when fills change (new wallet selected)
-  $: if (fills) {
-    visibleGroupCount = GROUPS_PER_PAGE;
-  }
 
   function groupFills(fills: Trade[]): FillGroupData[] {
     const grouped = new Map<string, Trade[]>();
@@ -42,10 +35,6 @@
       .sort((a, b) => b.latestTimestamp - a.latestTimestamp);
   }
 
-  function loadMoreGroups() {
-    visibleGroupCount += GROUPS_PER_PAGE;
-  }
-
   function handleLoadMoreTrades() {
     loadMoreTrades();
   }
@@ -59,14 +48,8 @@
       <FillGroup coin={group.coin} fills={group.fills} />
     {/each}
 
-    {#if hasMoreGroups}
-      <button class="load-more" on:click={loadMoreGroups}>
-        Show More Assets ({allGroups.length - visibleGroupCount} more)
-      </button>
-    {/if}
-
-    {#if $hasMoreTrades && !hasMoreGroups}
-      <button class="load-more older" on:click={handleLoadMoreTrades} disabled={$loadingMore}>
+    {#if $hasMoreTrades}
+      <button class="load-more" on:click={handleLoadMoreTrades} disabled={$loadingMore}>
         {#if $loadingMore}
           Loading...
         {:else}
@@ -95,7 +78,7 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
-    color: var(--accent);
+    color: var(--text-secondary);
     padding: 0.75rem;
     font-size: 0.875rem;
     cursor: pointer;
@@ -109,10 +92,5 @@
   .load-more:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-  }
-
-  .load-more.older {
-    color: var(--text-secondary);
-    border-style: dashed;
   }
 </style>

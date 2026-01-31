@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import { soundEnabled, playAlertSound } from '../utils/sound';
 import type { Trade } from '../types';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const trades = writable<Trade[]>([]);
@@ -23,8 +22,10 @@ export async function loadTrades(address: string) {
   currentAddress = address;
 
   try {
-    // Initial load: get all recent trades (API returns most recent)
-    const data = await api.getTrades(address);
+    // Load last 30 days of trades upfront
+    const now = Date.now();
+    const thirtyDaysAgo = now - THIRTY_DAYS_MS;
+    const data = await api.getTrades(address, thirtyDaysAgo, now);
 
     // Check for new trades (not on first load)
     if (!isFirstLoad && data.length > 0) {
@@ -40,20 +41,17 @@ export async function loadTrades(address: string) {
     // Update last known trade ID
     if (data.length > 0) {
       lastKnownTradeId = data[0].id;
-      // Track oldest loaded timestamp for pagination
       oldestLoadedTime = Math.min(...data.map(t => t.timestamp));
     } else {
-      oldestLoadedTime = Date.now();
+      oldestLoadedTime = thirtyDaysAgo;
     }
 
     isFirstLoad = false;
     trades.set(data);
 
-    // userFills returns up to ~recent fills, check if we might have more history
-    // Enable load more if we have data and it spans less than 30 days
-    const now = Date.now();
-    const thirtyDaysAgo = now - THIRTY_DAYS_MS;
-    hasMoreTrades.set(data.length > 0 && oldestLoadedTime > thirtyDaysAgo);
+    // Check if there might be older data (beyond 30 days)
+    // Only show load more if we have data and the oldest is close to our cutoff
+    hasMoreTrades.set(data.length > 0 && oldestLoadedTime > thirtyDaysAgo + 1000);
   } catch (e: any) {
     tradesError.set(e.message);
   } finally {
@@ -67,17 +65,9 @@ export async function loadMoreTrades() {
   loadingMore.set(true);
 
   try {
-    const now = Date.now();
-    const thirtyDaysAgo = now - THIRTY_DAYS_MS;
-
-    // Load from 30 days ago up to the oldest we've loaded
-    const endTime = oldestLoadedTime - 1; // Avoid duplicates
-    const startTime = thirtyDaysAgo;
-
-    if (endTime <= startTime) {
-      hasMoreTrades.set(false);
-      return;
-    }
+    // Load another 30 days before the oldest loaded
+    const endTime = oldestLoadedTime - 1;
+    const startTime = endTime - THIRTY_DAYS_MS;
 
     const moreData = await api.getTrades(currentAddress, startTime, endTime);
 
@@ -89,11 +79,14 @@ export async function loadMoreTrades() {
         return [...current, ...newTrades].sort((a, b) => b.timestamp - a.timestamp);
       });
 
-      oldestLoadedTime = Math.min(...moreData.map(t => t.timestamp));
-    }
+      const newOldest = Math.min(...moreData.map(t => t.timestamp));
 
-    // No more data to load after 30 days
-    hasMoreTrades.set(false);
+      // Check if there's likely more data
+      hasMoreTrades.set(newOldest > startTime + 1000);
+      oldestLoadedTime = newOldest;
+    } else {
+      hasMoreTrades.set(false);
+    }
   } catch (e: any) {
     console.error('Failed to load more trades:', e.message);
   } finally {
