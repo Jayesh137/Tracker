@@ -106,6 +106,11 @@ export class Storage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
+    // Ensure we never save an empty wallet list
+    if (this.store.wallets.length === 0) {
+      console.log('[Storage] Wallet list would be empty, restoring defaults');
+      this.store.wallets = [...DEFAULT_WALLETS];
+    }
     await this.save();
   }
 

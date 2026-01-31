@@ -39,11 +39,12 @@ export class RedisStorage {
   async load(): Promise<void> {
     try {
       const data = await this.redis.get<Store>(STORE_KEY);
+      console.log('[RedisStorage] Loaded data:', data ? `${data.wallets?.length || 0} wallets` : 'null');
 
-      if (data) {
+      if (data && data.wallets && data.wallets.length > 0) {
         // Migrate old format if needed
-        let wallets = data.wallets || [];
-        if (wallets.length > 0 && typeof wallets[0] === 'string') {
+        let wallets = data.wallets;
+        if (typeof wallets[0] === 'string') {
           wallets = (wallets as unknown as string[]).map((address: string) => ({
             address: address.toLowerCase(),
             name: ''
@@ -51,17 +52,25 @@ export class RedisStorage {
         }
 
         this.store = {
-          wallets: wallets.length > 0 ? wallets : DEFAULT_WALLETS,
+          wallets,
           pushSubscriptions: data.pushSubscriptions || [],
           settings: { ...DEFAULT_STORE.settings, ...data.settings }
         };
       } else {
-        this.store = { ...DEFAULT_STORE, wallets: DEFAULT_WALLETS, pushSubscriptions: [] };
+        // No data or empty wallets - use defaults and save
+        console.log('[RedisStorage] No wallets found, using defaults');
+        this.store = { ...DEFAULT_STORE, wallets: [...DEFAULT_WALLETS], pushSubscriptions: [] };
         await this.save();
       }
     } catch (error) {
       console.error('[RedisStorage] Failed to load:', error);
-      this.store = { ...DEFAULT_STORE, wallets: DEFAULT_WALLETS, pushSubscriptions: [] };
+      this.store = { ...DEFAULT_STORE, wallets: [...DEFAULT_WALLETS], pushSubscriptions: [] };
+      // Try to save defaults on error
+      try {
+        await this.save();
+      } catch (e) {
+        console.error('[RedisStorage] Failed to save defaults:', e);
+      }
     }
   }
 
@@ -93,6 +102,11 @@ export class RedisStorage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
+    // Ensure we never save an empty wallet list
+    if (this.store.wallets.length === 0) {
+      console.log('[RedisStorage] Wallet list would be empty, restoring defaults');
+      this.store.wallets = [...DEFAULT_WALLETS];
+    }
     await this.save();
   }
 
