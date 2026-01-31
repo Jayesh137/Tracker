@@ -21,14 +21,17 @@
     const grouped = new Map<string, Trade[]>();
 
     for (const fill of fills) {
-      const existing = grouped.get(fill.coin) || [];
+      // Group by coin + direction (e.g., "BTC|Open Short", "BTC|Close Long")
+      const direction = fill.direction || (fill.side === 'buy' ? 'Buy' : 'Sell');
+      const key = `${fill.coin}|${direction}`;
+      const existing = grouped.get(key) || [];
       existing.push(fill);
-      grouped.set(fill.coin, existing);
+      grouped.set(key, existing);
     }
 
     return Array.from(grouped.entries())
-      .map(([coin, fills]) => ({
-        coin,
+      .map(([key, fills]) => ({
+        coin: fills[0].coin, // Use actual coin name for display
         fills: fills.sort((a, b) => b.timestamp - a.timestamp),
         latestTimestamp: Math.max(...fills.map(f => f.timestamp))
       }))
@@ -44,7 +47,7 @@
   {#if fills.length === 0 && !loading}
     <p class="empty">No fills</p>
   {:else}
-    {#each visibleGroups as group (group.coin)}
+    {#each visibleGroups as group, i (group.coin + '-' + i)}
       <FillGroup coin={group.coin} fills={group.fills} />
     {/each}
 
