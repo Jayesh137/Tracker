@@ -23,10 +23,8 @@ export async function loadTrades(address: string) {
   currentAddress = address;
 
   try {
-    // Initial load: get last 7 days of trades
-    const now = Date.now();
-    const startTime = now - SEVEN_DAYS_MS;
-    const data = await api.getTrades(address, startTime, now);
+    // Initial load: get all recent trades (API returns most recent)
+    const data = await api.getTrades(address);
 
     // Check for new trades (not on first load)
     if (!isFirstLoad && data.length > 0) {
@@ -45,15 +43,17 @@ export async function loadTrades(address: string) {
       // Track oldest loaded timestamp for pagination
       oldestLoadedTime = Math.min(...data.map(t => t.timestamp));
     } else {
-      oldestLoadedTime = startTime;
+      oldestLoadedTime = Date.now();
     }
 
     isFirstLoad = false;
     trades.set(data);
 
-    // Check if there might be more data (trades from before 7 days, up to 30 days)
+    // userFills returns up to ~recent fills, check if we might have more history
+    // Enable load more if we have data and it spans less than 30 days
+    const now = Date.now();
     const thirtyDaysAgo = now - THIRTY_DAYS_MS;
-    hasMoreTrades.set(oldestLoadedTime > thirtyDaysAgo);
+    hasMoreTrades.set(data.length > 0 && oldestLoadedTime > thirtyDaysAgo);
   } catch (e: any) {
     tradesError.set(e.message);
   } finally {

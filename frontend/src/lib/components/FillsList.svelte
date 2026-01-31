@@ -53,7 +53,7 @@
 
 <div class="fills-list">
   {#if fills.length === 0 && !loading}
-    <p class="empty">No fills in the last 7 days</p>
+    <p class="empty">No fills</p>
   {:else}
     {#each visibleGroups as group (group.coin)}
       <FillGroup coin={group.coin} fills={group.fills} />
@@ -68,9 +68,9 @@
     {#if $hasMoreTrades && !hasMoreGroups}
       <button class="load-more older" on:click={handleLoadMoreTrades} disabled={$loadingMore}>
         {#if $loadingMore}
-          Loading older trades...
+          Loading...
         {:else}
-          Load Older Trades (up to 30 days)
+          Load More
         {/if}
       </button>
     {/if}
