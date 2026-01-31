@@ -14,6 +14,14 @@
   $: isProfit = totalPnl > 0;
   $: isLoss = totalPnl < 0;
 
+  // Determine primary direction
+  $: directions = fills.map(f => f.direction).filter(d => d);
+  $: uniqueDirections = [...new Set(directions)];
+  $: primaryDirection = uniqueDirections.length === 1 ? uniqueDirections[0] :
+                        uniqueDirections.length > 1 ? 'Mixed' : '';
+  $: isLong = primaryDirection.includes('Long');
+  $: isShort = primaryDirection.includes('Short');
+
   $: timestamps = fills.map(f => f.timestamp);
   $: firstFillDate = Math.min(...timestamps);
   $: lastFillDate = Math.max(...timestamps);
@@ -62,6 +70,9 @@
   >
     <div class="row-top">
       <span class="coin">{coin}</span>
+      {#if primaryDirection}
+        <span class="direction-badge" class:long={isLong} class:short={isShort}>{primaryDirection}</span>
+      {/if}
       <span class="date">{dateRange}</span>
       <span class="chevron">{expanded ? '▲' : '▼'}</span>
     </div>
@@ -123,6 +134,25 @@
     font-weight: 700;
     font-size: 17px;
     letter-spacing: -0.01em;
+  }
+
+  .direction-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .direction-badge.long {
+    color: var(--green);
+    background: rgba(34, 197, 94, 0.12);
+  }
+
+  .direction-badge.short {
+    color: var(--red);
+    background: rgba(239, 68, 68, 0.12);
   }
 
   .date {
