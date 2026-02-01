@@ -9,11 +9,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
-        name: 'Hyperliquid Tracker',
-        short_name: 'HL Tracker',
+        name: 'Tracker',
+        short_name: 'Tracker',
         description: 'Track Hyperliquid wallets in real-time',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#08080a',
+        background_color: '#08080a',
         display: 'standalone',
         start_url: '/',
         icons: [

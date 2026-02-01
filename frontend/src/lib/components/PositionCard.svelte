@@ -31,11 +31,14 @@
   }
 </script>
 
-<div class="position-card" class:long={isLong} class:short={!isLong}>
+<div class="position-card" class:long={isLong} class:short={!isLong} class:profit={isProfit} class:loss={!isProfit}>
+  <div class="accent-bar"></div>
+
   <div class="top-row">
     <div class="asset-info">
       <span class="coin">{position.coin}</span>
       <span class="badge" class:long={isLong} class:short={!isLong}>
+        <span class="direction-icon">{isLong ? '↑' : '↓'}</span>
         {position.side.toUpperCase()} {position.leverage}x
       </span>
     </div>
@@ -51,10 +54,14 @@
         <span class="price-label">Entry</span>
         <span class="price-val">{formatPrice(position.entryPrice)}</span>
       </div>
-      <span class="price-arrow">→</span>
+      <div class="price-arrow">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </div>
       <div class="price-item">
         <span class="price-label">Mark</span>
-        <span class="price-val">{formatPrice(position.currentPrice)}</span>
+        <span class="price-val mark">{formatPrice(position.currentPrice)}</span>
       </div>
     </div>
   </div>
@@ -62,7 +69,11 @@
   <div class="bottom-row">
     <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
       <span class="pnl-amount">{isProfit ? '+' : '-'}{formatPnl(position.unrealizedPnl)}</span>
-      <span class="pnl-pct">{isProfit ? '+' : ''}{Math.round(position.unrealizedPnlPercent)}%</span>
+      <span class="pnl-pct">
+        <span class="pnl-badge" class:profit={isProfit} class:loss={!isProfit}>
+          {isProfit ? '+' : ''}{Math.round(position.unrealizedPnlPercent)}%
+        </span>
+      </span>
     </div>
     <div class="meta">
       <span class="meta-item">
@@ -80,28 +91,43 @@
 <style>
   .position-card {
     background: var(--bg-card);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 1rem 1.125rem;
     border: 1px solid var(--border);
     position: relative;
     overflow: hidden;
+    transition: all var(--transition-fast);
+    animation: slideUp 0.3s ease-out forwards;
   }
 
-  .position-card::before {
-    content: '';
+  .position-card:hover {
+    border-color: var(--border);
+    background: var(--bg-card-hover);
+  }
+
+  .accent-bar {
     position: absolute;
     left: 0;
     top: 0;
     bottom: 0;
     width: 4px;
+    transition: box-shadow var(--transition-fast);
   }
 
-  .position-card.long::before {
-    background: var(--green);
+  .position-card.long .accent-bar {
+    background: linear-gradient(to bottom, var(--green), rgba(34, 197, 94, 0.6));
   }
 
-  .position-card.short::before {
-    background: var(--red);
+  .position-card.short .accent-bar {
+    background: linear-gradient(to bottom, var(--red), rgba(239, 68, 68, 0.6));
+  }
+
+  .position-card:hover.long .accent-bar {
+    box-shadow: 0 0 12px var(--green-glow);
+  }
+
+  .position-card:hover.short .accent-bar {
+    box-shadow: 0 0 12px var(--red-glow);
   }
 
   .top-row {
@@ -126,21 +152,27 @@
   .badge {
     display: inline-flex;
     align-items: center;
+    gap: 0.25rem;
     font-size: 0.6875rem;
     font-weight: 600;
     padding: 0.25rem 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     width: fit-content;
     letter-spacing: 0.02em;
   }
 
+  .direction-icon {
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
   .badge.long {
-    background: rgba(34, 197, 94, 0.12);
+    background: var(--green-dim);
     color: var(--green);
   }
 
   .badge.short {
-    background: rgba(239, 68, 68, 0.12);
+    background: var(--red-dim);
     color: var(--red);
   }
 
@@ -156,17 +188,19 @@
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .size-coin {
     font-size: 0.75rem;
-    color: var(--text-secondary);
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
   }
 
   .price-row {
     margin-bottom: 1rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .price-group {
@@ -182,22 +216,32 @@
   }
 
   .price-label {
-    font-size: 0.6875rem;
-    color: var(--text-secondary);
+    font-size: 0.625rem;
+    color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    font-weight: 500;
   }
 
   .price-val {
     font-size: 1rem;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+  }
+
+  .price-val.mark {
+    color: var(--text-primary);
   }
 
   .price-arrow {
-    color: var(--text-secondary);
-    font-size: 0.875rem;
+    color: var(--text-tertiary);
     margin-top: 0.75rem;
+    opacity: 0.5;
+  }
+
+  .price-arrow svg {
+    display: block;
   }
 
   .bottom-row {
@@ -209,15 +253,17 @@
   .pnl {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.375rem;
   }
 
-  .pnl.profit {
+  .pnl.profit .pnl-amount {
     color: var(--green);
+    text-shadow: 0 0 20px var(--green-glow);
   }
 
-  .pnl.loss {
+  .pnl.loss .pnl-amount {
     color: var(--red);
+    text-shadow: 0 0 20px var(--red-glow);
   }
 
   .pnl-amount {
@@ -225,11 +271,29 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
 
   .pnl-pct {
-    font-size: 0.875rem;
-    font-weight: 500;
+    display: flex;
+  }
+
+  .pnl-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pnl-badge.profit {
+    background: var(--green-dim);
+    color: var(--green);
+  }
+
+  .pnl-badge.loss {
+    background: var(--red-dim);
+    color: var(--red);
   }
 
   .meta {
@@ -245,10 +309,11 @@
   }
 
   .meta-label {
-    font-size: 0.625rem;
-    color: var(--text-secondary);
+    font-size: 0.5625rem;
+    color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
+    font-weight: 500;
   }
 
   .meta-val {
@@ -258,7 +323,17 @@
   }
 
   .meta-val.liq {
-    color: var(--text-secondary);
-    opacity: 0.7;
+    color: var(--text-tertiary);
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import FillRow from './FillRow.svelte';
   import type { Trade } from '../types';
+  import { slide } from 'svelte/transition';
 
   export let coin: string;
   export let fills: Trade[];
@@ -61,7 +62,8 @@
   }
 </script>
 
-<div class="fill-group" class:expanded>
+<div class="fill-group" class:expanded class:long={isLong} class:short={isShort}>
+  <div class="accent-bar"></div>
   <button
     class="group-header"
     on:click={() => expanded = !expanded}
@@ -71,16 +73,23 @@
     <div class="row-top">
       <span class="coin">{coin}</span>
       {#if primaryDirection}
-        <span class="direction-badge" class:long={isLong} class:short={isShort}>{primaryDirection}</span>
+        <span class="direction-badge" class:long={isLong} class:short={isShort}>
+          <span class="direction-icon">{isLong ? '↑' : isShort ? '↓' : '↔'}</span>
+          {primaryDirection}
+        </span>
       {/if}
       <span class="spacer"></span>
       <span class="date">{dateRange}</span>
-      <span class="chevron">{expanded ? '▲' : '▼'}</span>
+      <span class="chevron" class:open={expanded}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </span>
     </div>
     <div class="row-bottom">
       <span class="stat">{fills.length} fills</span>
       <span class="stat-sep">·</span>
-      <span class="stat">{formatVolume(totalVolume)}</span>
+      <span class="stat">{formatVolume(totalVolume)} {coin}</span>
       <span class="stat-sep">·</span>
       <span class="stat buys">{buyCount}B</span>
       <span class="stat sells">{sellCount}S</span>
@@ -93,9 +102,11 @@
   </button>
 
   {#if expanded}
-    <div class="fills">
-      {#each fills as fill (fill.id)}
-        <FillRow {fill} />
+    <div class="fills" transition:slide={{ duration: 200 }}>
+      {#each fills as fill, i (fill.id)}
+        <div style="animation-delay: {i * 30}ms" class="fill-item">
+          <FillRow {fill} />
+        </div>
       {/each}
     </div>
   {/if}
@@ -104,58 +115,93 @@
 <style>
   .fill-group {
     background: var(--bg-card);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     border: 1px solid var(--border);
-    margin-bottom: 10px;
+    margin-bottom: 0.625rem;
+    position: relative;
+    transition: all var(--transition-fast);
+    animation: slideUp 0.25s ease-out forwards;
+  }
+
+  .fill-group:hover {
+    border-color: var(--border);
+    background: var(--bg-card-hover);
+  }
+
+  .accent-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--border);
+    transition: all var(--transition-fast);
+  }
+
+  .fill-group.long .accent-bar {
+    background: var(--green);
+  }
+
+  .fill-group.short .accent-bar {
+    background: var(--red);
   }
 
   .group-header {
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    padding: 12px 14px;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem 0.875rem 1.125rem;
     background: transparent;
     border: none;
     color: var(--text-primary);
     cursor: pointer;
     text-align: left;
+    transition: background var(--transition-fast);
   }
 
-  .group-header:hover {
-    background: rgba(255, 255, 255, 0.02);
+  .group-header:active {
+    background: rgba(255, 255, 255, 0.03);
   }
 
   .row-top {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
   }
 
   .coin {
     font-weight: 700;
-    font-size: 16px;
+    font-size: 1rem;
     letter-spacing: -0.01em;
   }
 
   .direction-badge {
-    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.625rem;
     font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 0.125rem 0.375rem;
+    border-radius: var(--radius-sm);
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
 
+  .direction-icon {
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
   .direction-badge.long {
     color: var(--green);
-    background: rgba(34, 197, 94, 0.12);
+    background: var(--green-dim);
   }
 
   .direction-badge.short {
     color: var(--red);
-    background: rgba(239, 68, 68, 0.12);
+    background: var(--red-dim);
   }
 
   .spacer {
@@ -163,55 +209,90 @@
   }
 
   .date {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
   }
 
   .chevron {
-    font-size: 10px;
-    color: var(--text-secondary);
-    margin-left: 4px;
+    display: flex;
+    align-items: center;
+    color: var(--text-tertiary);
+    margin-left: 0.25rem;
+    transition: transform var(--transition-fast);
+  }
+
+  .chevron.open {
+    transform: rotate(180deg);
   }
 
   .row-bottom {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.375rem;
   }
 
   .stat {
-    font-size: 12px;
-    color: var(--text-secondary);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
   }
 
   .stat-sep {
-    font-size: 12px;
-    color: var(--text-secondary);
-    opacity: 0.5;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    opacity: 0.4;
   }
 
-  .stat.buys { color: var(--green); }
-  .stat.sells { color: var(--red); }
+  .stat.buys { color: var(--green); font-weight: 500; }
+  .stat.sells { color: var(--red); font-weight: 500; }
 
   .pnl {
     margin-left: auto;
     font-weight: 600;
-    font-size: 13px;
-    padding: 3px 8px;
-    border-radius: 5px;
+    font-size: 0.8125rem;
+    padding: 0.1875rem 0.5rem;
+    border-radius: var(--radius-sm);
+    font-variant-numeric: tabular-nums;
   }
 
   .pnl.profit {
     color: var(--green);
-    background: rgba(34, 197, 94, 0.12);
+    background: var(--green-dim);
   }
 
   .pnl.loss {
     color: var(--red);
-    background: rgba(239, 68, 68, 0.12);
+    background: var(--red-dim);
   }
 
   .fills {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-primary);
+  }
+
+  .fill-item {
+    animation: fadeSlideIn 0.2s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>

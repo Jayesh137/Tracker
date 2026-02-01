@@ -1,12 +1,20 @@
 <script lang="ts">
   import WalletDropdown from './WalletDropdown.svelte';
+  import { isLoading } from '../stores/wallets';
 
   export let onAddWallet: () => void = () => {};
   export let onOpenSettings: () => void = () => {};
 </script>
 
 <header>
-  <img src="/icons/hyperliquid-logo.png" alt="Hyperliquid" class="logo" />
+  <div class="logo-container">
+    <img src="/icons/hyperliquid-logo.png" alt="Hyperliquid" class="logo" />
+    {#if $isLoading}
+      <div class="loading-indicator">
+        <div class="spinner"></div>
+      </div>
+    {/if}
+  </div>
   <WalletDropdown {onAddWallet} />
   <button class="settings" on:click={onOpenSettings} aria-label="Settings">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -22,13 +30,48 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.75rem 1rem;
+    padding-top: calc(0.75rem + var(--safe-top, 0px));
     background: var(--bg-card);
     border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 50;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
+    pointer-events: none;
+  }
+
+  .logo-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .logo {
     height: 28px;
     width: auto;
+    transition: opacity var(--transition-fast);
+  }
+
+  .loading-indicator {
+    display: flex;
+    align-items: center;
+  }
+
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 
   .settings {
@@ -39,13 +82,31 @@
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 0.375rem;
-    transition: color 0.15s, background 0.15s;
+    padding: 0.625rem;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
   }
 
   .settings:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .settings:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .settings svg {
+    transition: transform var(--transition-base);
+  }
+
+  .settings:hover svg {
+    transform: rotate(30deg);
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 </style>
