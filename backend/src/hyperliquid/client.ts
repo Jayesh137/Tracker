@@ -99,31 +99,86 @@ export class HyperliquidClient {
   }
 
   async getTrades(address: string, startTime?: number, endTime?: number): Promise<Trade[]> {
-    // Use userFillsByTime for time-filtered queries, otherwise userFills
-    const body: Record<string, any> = startTime
-      ? {
+    // If no time range specified, use userFills which returns up to 10000 most recent
+    if (!startTime) {
+      const response = await fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'userFills',
+          user: address
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Hyperliquid API error: ${response.status}`);
+      }
+
+      const fills: HyperliquidFill[] = await response.json();
+      return fills.map(fill => this.transformFill(fill));
+    }
+
+    // With time range, paginate through userFillsByTime (max 2000 per request)
+    const allFills: HyperliquidFill[] = [];
+    let currentEndTime = endTime || Date.now();
+    const maxIterations = 10; // Safety limit to prevent infinite loops
+    let iterations = 0;
+
+    while (iterations < maxIterations) {
+      iterations++;
+
+      const response = await fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           type: 'userFillsByTime',
           user: address,
           startTime,
-          endTime: endTime || Date.now()
-        }
-      : {
-          type: 'userFills',
-          user: address
-        };
+          endTime: currentEndTime,
+          aggregateByTime: false
+        })
+      });
 
-    const response = await fetch(`${API_URL}/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
+      if (!response.ok) {
+        throw new Error(`Hyperliquid API error: ${response.status}`);
+      }
 
-    if (!response.ok) {
-      throw new Error(`Hyperliquid API error: ${response.status}`);
+      const fills: HyperliquidFill[] = await response.json();
+
+      if (fills.length === 0) {
+        break; // No more fills
+      }
+
+      allFills.push(...fills);
+
+      // If we got fewer than 2000, we've reached the end
+      if (fills.length < 2000) {
+        break;
+      }
+
+      // Find the oldest fill timestamp and use it as the new endTime
+      // Subtract 1ms to avoid duplicates
+      const oldestTimestamp = Math.min(...fills.map(f => f.time));
+      currentEndTime = oldestTimestamp - 1;
+
+      // Safety check: if endTime is now before startTime, stop
+      if (currentEndTime <= startTime) {
+        break;
+      }
     }
 
-    const fills: HyperliquidFill[] = await response.json();
-    return fills.map(fill => this.transformFill(fill));
+    // Sort by timestamp descending (newest first) and deduplicate by tid
+    const uniqueFills = new Map<number, HyperliquidFill>();
+    for (const fill of allFills) {
+      if (!uniqueFills.has(fill.tid)) {
+        uniqueFills.set(fill.tid, fill);
+      }
+    }
+
+    const sortedFills = Array.from(uniqueFills.values())
+      .sort((a, b) => b.time - a.time);
+
+    return sortedFills.map(fill => this.transformFill(fill));
   }
 
   transformPosition(pos: HyperliquidPosition, currentPriceStr?: string): Position {

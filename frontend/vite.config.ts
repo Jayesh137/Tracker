@@ -33,6 +33,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {
+            // Our backend API - always fetch fresh, no caching
+            urlPattern: /\/api\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
             urlPattern: /^https:\/\/api\.hyperliquid\.xyz\/.*/i,
             handler: 'NetworkFirst',
             options: {
