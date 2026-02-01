@@ -72,7 +72,6 @@
 
 html {
   height: 100%;
-  overflow: hidden;
 }
 
 body {
@@ -81,8 +80,7 @@ body {
   min-height: 100dvh;
   background: var(--bg-primary);
   color: var(--text-primary);
-  overflow: hidden;
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
@@ -433,11 +431,3 @@ input::placeholder {
   text-shadow: 0 0 12px var(--red-glow);
 }
 
-/* Pull to refresh prevention */
-@supports (-webkit-touch-callout: none) {
-  body {
-    position: fixed;
-    width: 100%;
-    height: 100%;
-  }
-}
