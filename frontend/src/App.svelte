@@ -37,7 +37,22 @@ import AccountBalance from './lib/components/AccountBalance.svelte';
       }
     }, 30000);
 
-    return () => clearInterval(refreshInterval);
+    // Reload data when app becomes visible (PWA resume from idle)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadWallets();
+        if ($selectedWallet) {
+          loadPositions($selectedWallet.address);
+          loadTrades($selectedWallet.address);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(refreshInterval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   });
 
   $: if ($selectedWallet) {
