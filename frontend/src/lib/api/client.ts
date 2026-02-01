@@ -44,13 +44,8 @@ export const api = {
   getPositions: (address: string) =>
     fetchJson<PositionsResponse>(`/wallet/${address}/positions`),
 
-  getTrades: (address: string, startTime?: number, endTime?: number) => {
-    const params = new URLSearchParams();
-    if (startTime) params.set('startTime', startTime.toString());
-    if (endTime) params.set('endTime', endTime.toString());
-    const query = params.toString() ? `?${params.toString()}` : '';
-    return fetchJson<Trade[]>(`/wallet/${address}/trades${query}`);
-  },
+  getTrades: (address: string) =>
+    fetchJson<Trade[]>(`/wallet/${address}/trades`),
 
   // Push notifications
   getVapidPublicKey: () =>

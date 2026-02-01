@@ -17,11 +17,9 @@ export async function loadTrades(address: string) {
   currentAddress = address;
 
   try {
-    // Load full history by requesting from Jan 1, 2023 (Hyperliquid launch era)
-    // userFillsByTime allows fetching complete trade history
-    const startTime = new Date('2023-01-01').getTime();
-    const endTime = Date.now();
-    const data = await api.getTrades(address, startTime, endTime);
+    // Use userFills endpoint which returns up to 2000 most recent fills
+    // Note: userFillsByTime endpoint doesn't work reliably for all wallets
+    const data = await api.getTrades(address);
 
     // Check for new trades (not on first load)
     if (!isFirstLoad && data.length > 0) {
