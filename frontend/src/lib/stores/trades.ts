@@ -34,12 +34,10 @@ export async function loadTrades(address: string) {
     // Update last known trade ID
     if (data.length > 0) {
       lastKnownTradeId = data[0].id;
-      oldestLoadedTime = Math.min(...data.map(t => t.timestamp));
     }
 
     isFirstLoad = false;
     trades.set(data);
-    hasMoreTrades.set(false); // userFills returns all available
   } catch (e: any) {
     tradesError.set(e.message);
   } finally {
