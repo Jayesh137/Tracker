@@ -99,23 +99,62 @@ export class HyperliquidClient {
   }
 
   async getTrades(address: string): Promise<Trade[]> {
-    // Use userFills endpoint which returns up to 2000 most recent fills
-    // Note: userFillsByTime endpoint doesn't work reliably for all wallets
-    const response = await fetch(`${API_URL}/info`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'userFills',
-        user: address
-      })
-    });
+    // Fetch from both endpoints to get maximum fill history
+    // userFills: returns 2000 most recent fills (sorted by recency)
+    // userFillsByTime: returns fills from a time range (can get older fills)
+    const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
 
-    if (!response.ok) {
-      throw new Error(`Hyperliquid API error: ${response.status}`);
+    const [recentResponse, historicalResponse] = await Promise.all([
+      fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'userFills',
+          user: address
+        })
+      }),
+      fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'userFillsByTime',
+          user: address,
+          startTime: oneYearAgo
+        })
+      })
+    ]);
+
+    if (!recentResponse.ok) {
+      throw new Error(`Hyperliquid API error: ${recentResponse.status}`);
     }
 
-    const fills: HyperliquidFill[] = await response.json();
-    return fills.map(fill => this.transformFill(fill));
+    const recentFills: HyperliquidFill[] = await recentResponse.json();
+    let historicalFills: HyperliquidFill[] = [];
+
+    if (historicalResponse.ok) {
+      const text = await historicalResponse.text();
+      if (text) {
+        try {
+          historicalFills = JSON.parse(text);
+        } catch {
+          // Ignore parse errors for historical endpoint
+        }
+      }
+    }
+
+    // Combine and deduplicate by tid
+    const uniqueFills = new Map<number, HyperliquidFill>();
+    for (const fill of [...recentFills, ...historicalFills]) {
+      if (!uniqueFills.has(fill.tid)) {
+        uniqueFills.set(fill.tid, fill);
+      }
+    }
+
+    // Sort by timestamp descending (newest first)
+    const sortedFills = Array.from(uniqueFills.values())
+      .sort((a, b) => b.time - a.time);
+
+    return sortedFills.map(fill => this.transformFill(fill));
   }
 
   transformPosition(pos: HyperliquidPosition, currentPriceStr?: string): Position {
@@ -125,6 +164,10 @@ export class HyperliquidClient {
     const unrealizedPnl = parseFloat(pos.unrealizedPnl);
     const marginUsed = parseFloat(pos.marginUsed);
     const liquidationPx = pos.liquidationPx ? parseFloat(pos.liquidationPx) : null;
+    // Use returnOnEquity from API (e.g., 4.67 = +467% return)
+    // This accounts for funding fees, giving accurate PnL percentage
+    const roe = parseFloat(pos.returnOnEquity) || 0;
+    const unrealizedPnlPercent = roe * 100;
 
     return {
       coin: pos.coin,
@@ -132,7 +175,7 @@ export class HyperliquidClient {
       entryPrice,
       currentPrice,
       unrealizedPnl,
-      unrealizedPnlPercent: marginUsed > 0 ? (unrealizedPnl / marginUsed) * 100 : 0,
+      unrealizedPnlPercent,
       side: size >= 0 ? 'long' : 'short',
       leverage: pos.leverage.value,
       liquidationPrice: liquidationPx,
