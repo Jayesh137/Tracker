@@ -78,6 +78,12 @@ export interface Trade {
   timestamp: number;
 }
 
+export interface TradesResponse {
+  trades: Trade[];
+  hasMore: boolean;
+  incomplete: boolean;
+}
+
 export interface PushSubscription {
   endpoint: string;
   keys: {

@@ -5,7 +5,8 @@ import type {
   Position,
   PositionsResponse,
   AccountSummary,
-  Trade
+  Trade,
+  TradesResponse
 } from '../types/index.js';
 
 const API_URL = 'https://api.hyperliquid.xyz';
@@ -98,63 +99,153 @@ export class HyperliquidClient {
     };
   }
 
-  async getTrades(address: string): Promise<Trade[]> {
-    // Fetch from both endpoints to get maximum fill history
-    // userFills: returns 2000 most recent fills (sorted by recency)
-    // userFillsByTime: returns fills from a time range (can get older fills)
-    const oneYearAgo = Date.now() - (365 * 24 * 60 * 60 * 1000);
+  async getTrades(address: string, startTime?: number, endTime?: number): Promise<TradesResponse> {
+    const now = Date.now();
+    const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
 
-    const [recentResponse, historicalResponse] = await Promise.all([
-      fetch(`${API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'userFills',
-          user: address
-        })
-      }),
-      fetch(`${API_URL}/info`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'userFillsByTime',
-          user: address,
-          startTime: oneYearAgo
-        })
-      })
-    ]);
+    // Default to last 7 days if no time params
+    const requestedStart = startTime ?? sevenDaysAgo;
+    const requestedEnd = endTime ?? now;
 
-    if (!recentResponse.ok) {
-      throw new Error(`Hyperliquid API error: ${recentResponse.status}`);
-    }
+    // Clamp to 1 year ago max
+    const clampedStartTime = Math.max(requestedStart, oneYearAgo);
 
-    const recentFills: HyperliquidFill[] = await recentResponse.json();
-    let historicalFills: HyperliquidFill[] = [];
+    let incomplete = false;
+    const allFills: HyperliquidFill[] = [];
 
-    if (historicalResponse.ok) {
-      const text = await historicalResponse.text();
-      if (text) {
-        try {
-          historicalFills = JSON.parse(text);
-        } catch {
-          // Ignore parse errors for historical endpoint
+    // Determine if this is an initial load (no startTime provided)
+    const isInitialLoad = startTime === undefined;
+
+    try {
+      // Fetch from both default and XYZ DEX in parallel using fetchFillsForWindow
+      const windowPromises: Promise<HyperliquidFill[]>[] = [
+        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd),
+        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd, 'xyz')
+      ];
+
+      // On initial load, also fetch recent fills from both DEXes
+      const recentPromises: Promise<HyperliquidFill[]>[] = [];
+      if (isInitialLoad) {
+        recentPromises.push(
+          this.fetchRecentFills(address),
+          this.fetchRecentFills(address, 'xyz')
+        );
+      }
+
+      const results = await Promise.allSettled([...windowPromises, ...recentPromises]);
+
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          allFills.push(...result.value);
+        } else {
+          console.error('Fill fetch error:', result.reason);
+          incomplete = true;
         }
       }
+    } catch (error) {
+      console.error('Unexpected error fetching trades:', error);
+      incomplete = true;
     }
 
-    // Combine and deduplicate by tid
+    // Deduplicate by tid
     const uniqueFills = new Map<number, HyperliquidFill>();
-    for (const fill of [...recentFills, ...historicalFills]) {
+    for (const fill of allFills) {
       if (!uniqueFills.has(fill.tid)) {
         uniqueFills.set(fill.tid, fill);
       }
     }
 
-    // Sort by timestamp descending (newest first)
-    const sortedFills = Array.from(uniqueFills.values())
-      .sort((a, b) => b.time - a.time);
+    // Filter to requested window
+    const filteredFills = Array.from(uniqueFills.values())
+      .filter(fill => fill.time >= clampedStartTime && fill.time <= requestedEnd);
 
-    return sortedFills.map(fill => this.transformFill(fill));
+    // Sort newest first
+    filteredFills.sort((a, b) => b.time - a.time);
+
+    const trades = filteredFills.map(fill => this.transformFill(fill));
+    const hasMore = clampedStartTime > oneYearAgo;
+
+    return { trades, hasMore, incomplete };
+  }
+
+  private async fetchRecentFills(address: string, dex?: string): Promise<HyperliquidFill[]> {
+    const body: Record<string, string> = {
+      type: 'userFills',
+      user: address
+    };
+    if (dex) {
+      body.dex = dex;
+    }
+
+    const response = await fetch(`${API_URL}/info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      throw new Error(`userFills API error: ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  private async fetchFillsForWindow(
+    address: string,
+    startTime: number,
+    endTime: number,
+    dex?: string
+  ): Promise<HyperliquidFill[]> {
+    const allFills: HyperliquidFill[] = [];
+    let currentStart = startTime;
+    const maxIterations = 10;
+
+    for (let i = 0; i < maxIterations; i++) {
+      const body: Record<string, unknown> = {
+        type: 'userFillsByTime',
+        user: address,
+        startTime: currentStart,
+        endTime
+      };
+      if (dex) {
+        body.dex = dex;
+      }
+
+      const response = await fetch(`${API_URL}/info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`userFillsByTime API error: ${response.status}`);
+      }
+
+      const text = await response.text();
+      if (!text) break;
+
+      let fills: HyperliquidFill[];
+      try {
+        fills = JSON.parse(text);
+      } catch {
+        break;
+      }
+
+      if (fills.length === 0) break;
+
+      allFills.push(...fills);
+
+      // If response has 2000 fills, paginate by advancing startTime
+      if (fills.length >= 2000) {
+        const latestTime = Math.max(...fills.map(f => f.time));
+        currentStart = latestTime + 1;
+      } else {
+        break;
+      }
+    }
+
+    return allFills;
   }
 
   transformPosition(pos: HyperliquidPosition, currentPriceStr?: string): Position {

@@ -95,10 +95,12 @@ export function createRoutes(
   // Get trades for wallet
   router.get('/wallet/:address/trades', async (req: Request, res: Response) => {
     const { address } = req.params;
+    const startTime = req.query.startTime ? parseInt(req.query.startTime as string, 10) : undefined;
+    const endTime = req.query.endTime ? parseInt(req.query.endTime as string, 10) : undefined;
 
     try {
-      const trades = await hlClient.getTrades(address);
-      res.json(trades);
+      const result = await hlClient.getTrades(address, startTime, endTime);
+      res.json(result);
     } catch (error: any) {
       console.error('Failed to fetch trades:', error.message);
       res.status(500).json({ error: 'Failed to fetch trades' });
