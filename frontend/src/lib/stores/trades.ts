@@ -14,14 +14,19 @@ let lastKnownTradeId: string | null = null;
 let isFirstLoad = true;
 let currentAddress: string | null = null;
 let oldestTimestamp: number | null = null;
+let loadGeneration = 0; // increments on each wallet switch to discard stale responses
 
 export async function loadTrades(address: string) {
   tradesLoading.set(true);
   tradesError.set(null);
   currentAddress = address;
+  const thisGeneration = loadGeneration;
 
   try {
     const result = await api.getTrades(address);
+
+    // Discard result if wallet changed while we were fetching
+    if (thisGeneration !== loadGeneration) return;
 
     // Check for new trades (not on first load)
     if (!isFirstLoad && result.trades.length > 0) {
@@ -43,9 +48,12 @@ export async function loadTrades(address: string) {
     tradesHasMore.set(result.hasMore);
     tradesIncomplete.set(result.incomplete);
   } catch (e: any) {
+    if (thisGeneration !== loadGeneration) return;
     tradesError.set(e.message);
   } finally {
-    tradesLoading.set(false);
+    if (thisGeneration === loadGeneration) {
+      tradesLoading.set(false);
+    }
   }
 }
 
@@ -53,12 +61,16 @@ export async function loadMoreTrades() {
   if (!currentAddress || !oldestTimestamp || get(tradesLoadingMore)) return;
 
   tradesLoadingMore.set(true);
+  const thisGeneration = loadGeneration;
 
   try {
     const endTime = oldestTimestamp - 1;
     const startTime = endTime - (7 * 24 * 60 * 60 * 1000); // 1 week back
 
     const result = await api.getTrades(currentAddress, startTime, endTime);
+
+    // Discard result if wallet changed while we were fetching
+    if (thisGeneration !== loadGeneration) return;
 
     if (result.trades.length > 0) {
       oldestTimestamp = Math.min(...result.trades.map(t => t.timestamp));
@@ -75,13 +87,17 @@ export async function loadMoreTrades() {
       tradesIncomplete.set(true);
     }
   } catch (e: any) {
+    if (thisGeneration !== loadGeneration) return;
     tradesError.set(e.message);
   } finally {
-    tradesLoadingMore.set(false);
+    if (thisGeneration === loadGeneration) {
+      tradesLoadingMore.set(false);
+    }
   }
 }
 
 export function resetTradesState() {
+  loadGeneration++; // invalidate any in-flight requests
   lastKnownTradeId = null;
   isFirstLoad = true;
   currentAddress = null;

@@ -118,22 +118,25 @@ export class HyperliquidClient {
     const isInitialLoad = startTime === undefined;
 
     try {
-      // Fetch from both default and XYZ DEX in parallel using fetchFillsForWindow
-      const windowPromises: Promise<HyperliquidFill[]>[] = [
-        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd),
-        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd, 'xyz')
-      ];
+      // On initial load, use userFills (fast, returns 2000 most recent) from both DEXes
+      // On "Load More", use userFillsByTime for the specific time window
+      const promises: Promise<HyperliquidFill[]>[] = [];
 
-      // On initial load, also fetch recent fills from both DEXes
-      const recentPromises: Promise<HyperliquidFill[]>[] = [];
       if (isInitialLoad) {
-        recentPromises.push(
+        // userFills is faster and returns the most recent fills — sufficient for initial view
+        promises.push(
           this.fetchRecentFills(address),
           this.fetchRecentFills(address, 'xyz')
         );
+      } else {
+        // For pagination, use time-windowed fetch with both DEXes
+        promises.push(
+          this.fetchFillsForWindow(address, clampedStartTime, requestedEnd),
+          this.fetchFillsForWindow(address, clampedStartTime, requestedEnd, 'xyz')
+        );
       }
 
-      const results = await Promise.allSettled([...windowPromises, ...recentPromises]);
+      const results = await Promise.allSettled(promises);
 
       for (const result of results) {
         if (result.status === 'fulfilled') {
