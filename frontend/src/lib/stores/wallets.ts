@@ -1,48 +1,86 @@
 import { writable, derived } from 'svelte/store';
+import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { api } from '../api/client';
 import type { Wallet } from '../types';
 
-const WALLETS_STORAGE_KEY = 'hl-tracker-wallets';
-const SELECTED_WALLET_KEY = 'hl-tracker-selected-wallet';
+const WALLETS_IDB_KEY = 'hl-tracker-wallets';
+const SELECTED_IDB_KEY = 'hl-tracker-selected-wallet';
 
-function saveWalletsToStorage(walletsData: Wallet[]): void {
+// Also keep localStorage as a fallback read source for migration
+const WALLETS_LS_KEY = 'hl-tracker-wallets';
+const SELECTED_LS_KEY = 'hl-tracker-selected-wallet';
+
+async function saveWallets(walletsData: Wallet[]): Promise<void> {
   try {
-    localStorage.setItem(WALLETS_STORAGE_KEY, JSON.stringify(walletsData));
+    await idbSet(WALLETS_IDB_KEY, walletsData);
   } catch (e) {
-    console.warn('[Wallets] Failed to save to localStorage:', e);
+    console.warn('[Wallets] Failed to save to IndexedDB:', e);
+  }
+  // Also save to localStorage as backup
+  try {
+    localStorage.setItem(WALLETS_LS_KEY, JSON.stringify(walletsData));
+  } catch (e) {
+    // localStorage may be full or unavailable
   }
 }
 
-function loadWalletsFromStorage(): Wallet[] {
+async function loadWalletsFromStorage(): Promise<Wallet[]> {
+  // Try IndexedDB first
   try {
-    const stored = localStorage.getItem(WALLETS_STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
+    const stored = await idbGet<Wallet[]>(WALLETS_IDB_KEY);
+    if (stored && Array.isArray(stored) && stored.length > 0) {
+      return stored;
+    }
+  } catch (e) {
+    console.warn('[Wallets] Failed to load from IndexedDB:', e);
+  }
+
+  // Fall back to localStorage (migration path)
+  try {
+    const lsStored = localStorage.getItem(WALLETS_LS_KEY);
+    if (lsStored) {
+      const parsed = JSON.parse(lsStored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Migrate to IndexedDB
+        await idbSet(WALLETS_IDB_KEY, parsed).catch(() => {});
         return parsed;
       }
     }
   } catch (e) {
     console.warn('[Wallets] Failed to load from localStorage:', e);
   }
+
   return [];
 }
 
-function saveSelectedWalletToStorage(wallet: Wallet | null): void {
+async function saveSelectedWallet(wallet: Wallet | null): Promise<void> {
   try {
     if (wallet) {
-      localStorage.setItem(SELECTED_WALLET_KEY, wallet.address);
+      await idbSet(SELECTED_IDB_KEY, wallet.address);
     } else {
-      localStorage.removeItem(SELECTED_WALLET_KEY);
+      await idbDel(SELECTED_IDB_KEY);
     }
   } catch (e) {
     console.warn('[Wallets] Failed to save selected wallet:', e);
   }
+  // Also save to localStorage as backup
+  try {
+    if (wallet) {
+      localStorage.setItem(SELECTED_LS_KEY, wallet.address);
+    } else {
+      localStorage.removeItem(SELECTED_LS_KEY);
+    }
+  } catch (e) {}
 }
 
-function loadSelectedWalletFromStorage(): string | null {
+async function loadSelectedWalletAddress(): Promise<string | null> {
   try {
-    return localStorage.getItem(SELECTED_WALLET_KEY);
+    const addr = await idbGet<string>(SELECTED_IDB_KEY);
+    if (addr) return addr;
+  } catch (e) {}
+
+  try {
+    return localStorage.getItem(SELECTED_LS_KEY);
   } catch (e) {
     return null;
   }
@@ -51,12 +89,10 @@ function loadSelectedWalletFromStorage(): string | null {
 function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
   const merged = new Map<string, Wallet>();
 
-  // Add local wallets first (these are the user's own additions)
   for (const wallet of local) {
     merged.set(wallet.address.toLowerCase(), wallet);
   }
 
-  // Add remote wallets, but don't overwrite local ones
   for (const wallet of remote) {
     const key = wallet.address.toLowerCase();
     if (!merged.has(key)) {
@@ -65,6 +101,21 @@ function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
   }
 
   return Array.from(merged.values());
+}
+
+async function syncToBackendWithRetry(fn: () => Promise<any>): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    // Retry once after 2 seconds
+    setTimeout(async () => {
+      try {
+        await fn();
+      } catch (e2) {
+        console.warn('[Wallets] Backend sync retry failed:', e2);
+      }
+    }, 2000);
+  }
 }
 
 export const wallets = writable<Wallet[]>([]);
@@ -78,13 +129,11 @@ export async function loadWallets() {
   isLoading.set(true);
   error.set(null);
 
-  // Load local wallets first - these are the source of truth
-  const localWallets = loadWalletsFromStorage();
+  const localWallets = await loadWalletsFromStorage();
   if (localWallets.length > 0) {
     wallets.set(localWallets);
 
-    // Restore selected wallet from storage
-    const savedSelectedAddress = loadSelectedWalletFromStorage();
+    const savedSelectedAddress = await loadSelectedWalletAddress();
     const savedWallet = savedSelectedAddress
       ? localWallets.find(w => w.address.toLowerCase() === savedSelectedAddress.toLowerCase())
       : null;
@@ -94,26 +143,21 @@ export async function loadWallets() {
   try {
     const remoteWallets = await api.getWallets();
 
-    // Merge local and remote wallets, preferring local
     const merged = mergeWallets(localWallets, remoteWallets);
     wallets.set(merged);
-    saveWalletsToStorage(merged);
+    await saveWallets(merged);
 
-    // Sync any local-only wallets to the backend
     const remoteAddresses = new Set(remoteWallets.map(w => w.address.toLowerCase()));
     for (const wallet of localWallets) {
       if (!remoteAddresses.has(wallet.address.toLowerCase())) {
-        // Sync to backend in background (don't await)
-        api.addWallet(wallet.address, wallet.name).catch(() => {});
+        syncToBackendWithRetry(() => api.addWallet(wallet.address, wallet.name));
       }
     }
 
-    // Auto-select first wallet if none selected
     if (merged.length > 0) {
       selectedWallet.update(current => current || merged[0]);
     }
   } catch (e: any) {
-    // If backend fails, we still have local wallets
     if (localWallets.length === 0) {
       error.set(e.message);
     }
@@ -128,11 +172,9 @@ export async function addWallet(address: string, name: string) {
   const normalizedAddress = address.toLowerCase();
   const newWallet: Wallet = { address: normalizedAddress, name };
 
-  // Save to localStorage immediately - this is the source of truth
   let currentWallets: Wallet[] = [];
   wallets.subscribe(w => currentWallets = w)();
 
-  // Check if wallet already exists
   if (currentWallets.some(w => w.address.toLowerCase() === normalizedAddress)) {
     error.set('Wallet already exists');
     return false;
@@ -140,17 +182,11 @@ export async function addWallet(address: string, name: string) {
 
   const updatedWallets = [...currentWallets, newWallet];
   wallets.set(updatedWallets);
-  saveWalletsToStorage(updatedWallets);
+  await saveWallets(updatedWallets);
   selectedWallet.set(newWallet);
-  saveSelectedWalletToStorage(newWallet);
+  await saveSelectedWallet(newWallet);
 
-  // Sync to backend in background
-  try {
-    await api.addWallet(address, name);
-  } catch (e: any) {
-    // Backend sync failed, but wallet is saved locally
-    console.warn('[Wallets] Failed to sync wallet to backend:', e.message);
-  }
+  syncToBackendWithRetry(() => api.addWallet(address, name));
 
   return true;
 }
@@ -160,30 +196,23 @@ export async function removeWallet(address: string) {
 
   const normalizedAddress = address.toLowerCase();
 
-  // Update local storage first - this is the source of truth
   let updatedWallets: Wallet[] = [];
   wallets.update(w => {
     updatedWallets = w.filter(wallet => wallet.address.toLowerCase() !== normalizedAddress);
     return updatedWallets;
   });
-  saveWalletsToStorage(updatedWallets);
+  await saveWallets(updatedWallets);
 
-  // Select another wallet if we removed the selected one
   selectedWallet.update(current => {
     if (current?.address.toLowerCase() === normalizedAddress) {
       const newSelected = updatedWallets.length > 0 ? updatedWallets[0] : null;
-      saveSelectedWalletToStorage(newSelected);
+      saveSelectedWallet(newSelected);
       return newSelected;
     }
     return current;
   });
 
-  // Sync to backend in background
-  try {
-    await api.removeWallet(address);
-  } catch (e: any) {
-    console.warn('[Wallets] Failed to sync removal to backend:', e.message);
-  }
+  syncToBackendWithRetry(() => api.removeWallet(address));
 
   return true;
 }
@@ -193,7 +222,6 @@ export async function renameWallet(address: string, name: string) {
 
   const normalizedAddress = address.toLowerCase();
 
-  // Update local storage first - this is the source of truth
   let updatedWallets: Wallet[] = [];
   wallets.update(w => {
     updatedWallets = w.map(wallet =>
@@ -201,9 +229,8 @@ export async function renameWallet(address: string, name: string) {
     );
     return updatedWallets;
   });
-  saveWalletsToStorage(updatedWallets);
+  await saveWallets(updatedWallets);
 
-  // Update selectedWallet if it's the one being renamed
   selectedWallet.update(current => {
     if (current?.address.toLowerCase() === normalizedAddress) {
       return { ...current, name };
@@ -211,17 +238,12 @@ export async function renameWallet(address: string, name: string) {
     return current;
   });
 
-  // Sync to backend in background
-  try {
-    await api.renameWallet(address, name);
-  } catch (e: any) {
-    console.warn('[Wallets] Failed to sync rename to backend:', e.message);
-  }
+  syncToBackendWithRetry(() => api.renameWallet(address, name));
 
   return true;
 }
 
-// Subscribe to selectedWallet changes to persist selection
+// Persist selected wallet on change
 selectedWallet.subscribe(wallet => {
-  saveSelectedWalletToStorage(wallet);
+  saveSelectedWallet(wallet);
 });

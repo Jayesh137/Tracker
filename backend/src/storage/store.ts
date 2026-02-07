@@ -4,16 +4,8 @@ import type { Store, PushSubscription, Wallet } from '../types/index.js';
 
 const MAX_WALLETS = 10;
 
-const DEFAULT_WALLETS: Wallet[] = [
-  { address: '0x45d26f28196d226497130c4bac709d808fed4029', name: 'Ezekiel' },
-  { address: '0x418aa6bf98a2b2bc93779f810330d88cde488888', name: '518' },
-  { address: '0x94d3735543ecb3d339064151118644501c933814', name: 'Dash' },
-  { address: '0x0ddf9bae2af4b874b96d287a5ad42eb47138a902', name: 'Pension' },
-  { address: '0x8def9f50456c6c4e37fa5d3d57f108ed23992dae', name: 'Loracle' },
-];
-
 const DEFAULT_STORE: Store = {
-  wallets: DEFAULT_WALLETS,
+  wallets: [],
   pushSubscriptions: [],
   settings: {
     notificationsEnabled: true
@@ -51,9 +43,7 @@ export class Storage {
         }));
       }
 
-      const wallets = parsed.wallets && parsed.wallets.length > 0
-        ? parsed.wallets
-        : DEFAULT_WALLETS;
+      const wallets = parsed.wallets || [];
       this.store = {
         wallets,
         pushSubscriptions: parsed.pushSubscriptions || [],
@@ -62,7 +52,7 @@ export class Storage {
     } catch (error: any) {
       if (error.code === 'ENOENT') {
         this.store = {
-          wallets: DEFAULT_WALLETS,
+          wallets: [],
           pushSubscriptions: [],
           settings: { ...DEFAULT_STORE.settings }
         };
@@ -106,11 +96,6 @@ export class Storage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
-    // Ensure we never save an empty wallet list
-    if (this.store.wallets.length === 0) {
-      console.log('[Storage] Wallet list would be empty, restoring defaults');
-      this.store.wallets = [...DEFAULT_WALLETS];
-    }
     await this.save();
   }
 

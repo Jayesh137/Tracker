@@ -3,16 +3,8 @@ import type { Store, PushSubscription, Wallet } from '../types/index.js';
 
 const STORE_KEY = 'hl-tracker:store';
 
-const DEFAULT_WALLETS: Wallet[] = [
-  { address: '0x45d26f28196d226497130c4bac709d808fed4029', name: 'Ezekiel' },
-  { address: '0x418aa6bf98a2b2bc93779f810330d88cde488888', name: '518' },
-  { address: '0x94d3735543ecb3d339064151118644501c933814', name: 'Dash' },
-  { address: '0x0ddf9bae2af4b874b96d287a5ad42eb47138a902', name: 'Pension' },
-  { address: '0x8def9f50456c6c4e37fa5d3d57f108ed23992dae', name: 'Loracle' },
-];
-
 const DEFAULT_STORE: Store = {
-  wallets: DEFAULT_WALLETS,
+  wallets: [],
   pushSubscriptions: [],
   settings: {
     notificationsEnabled: true
@@ -41,7 +33,7 @@ export class RedisStorage {
       const data = await this.redis.get<Store>(STORE_KEY);
       console.log('[RedisStorage] Loaded data:', data ? `${data.wallets?.length || 0} wallets` : 'null');
 
-      if (data && data.wallets && data.wallets.length > 0) {
+      if (data && data.wallets) {
         // Migrate old format if needed
         let wallets = data.wallets;
         if (typeof wallets[0] === 'string') {
@@ -57,14 +49,14 @@ export class RedisStorage {
           settings: { ...DEFAULT_STORE.settings, ...data.settings }
         };
       } else {
-        // No data or empty wallets - use defaults and save
-        console.log('[RedisStorage] No wallets found, using defaults');
-        this.store = { ...DEFAULT_STORE, wallets: [...DEFAULT_WALLETS], pushSubscriptions: [] };
+        // No data - start with empty store
+        console.log('[RedisStorage] No data found, starting empty');
+        this.store = { ...DEFAULT_STORE, wallets: [], pushSubscriptions: [] };
         await this.save();
       }
     } catch (error) {
       console.error('[RedisStorage] Failed to load:', error);
-      this.store = { ...DEFAULT_STORE, wallets: [...DEFAULT_WALLETS], pushSubscriptions: [] };
+      this.store = { ...DEFAULT_STORE, wallets: [], pushSubscriptions: [] };
       // Try to save defaults on error
       try {
         await this.save();
@@ -102,11 +94,6 @@ export class RedisStorage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
-    // Ensure we never save an empty wallet list
-    if (this.store.wallets.length === 0) {
-      console.log('[RedisStorage] Wallet list would be empty, restoring defaults');
-      this.store.wallets = [...DEFAULT_WALLETS];
-    }
     await this.save();
   }
 
