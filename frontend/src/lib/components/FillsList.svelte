@@ -4,10 +4,8 @@
 
   export let fills: Trade[] = [];
   export let loading: boolean = false;
-  export let loadingMore: boolean = false;
   export let hasMore: boolean = false;
   export let incomplete: boolean = false;
-  export let onLoadMore: (() => void) | null = null;
 
   interface CoinGroup {
     coin: string;
@@ -142,22 +140,10 @@
     {/each}
 
     {#if hasMore}
-      <div class="load-more">
-        <button
-          class="load-more-btn"
-          on:click={onLoadMore}
-          disabled={loadingMore}
-        >
-          {#if loadingMore}
-            <span class="spinner"></span>
-            Loading...
-          {:else}
-            Load More
-          {/if}
-        </button>
+      <div class="loading-history">
+        <span class="spinner"></span>
+        <span>Loading history...</span>
       </div>
-    {:else if fills.length > 0}
-      <p class="history-end">All history loaded</p>
     {/if}
   {/if}
 </div>
@@ -244,38 +230,14 @@
     font-size: 0.875rem;
   }
 
-  .load-more {
-    padding: 1rem 0 0.5rem;
-    display: flex;
-    justify-content: center;
-  }
-
-  .load-more-btn {
+  .loading-history {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-    font-weight: 500;
-    padding: 0.625rem 1.5rem;
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    width: 100%;
     justify-content: center;
-  }
-
-  .load-more-btn:hover:not(:disabled) {
-    background: var(--bg-card-hover);
-    border-color: var(--accent);
-    color: var(--text-primary);
-  }
-
-  .load-more-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
+    gap: 0.5rem;
+    padding: 1rem;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
   }
 
   .spinner {
@@ -289,13 +251,6 @@
 
   @keyframes spin {
     to { transform: rotate(360deg); }
-  }
-
-  .history-end {
-    color: var(--text-tertiary);
-    text-align: center;
-    padding: 1rem;
-    margin: 0;
     font-size: 0.75rem;
   }
 </style>

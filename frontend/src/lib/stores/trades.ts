@@ -47,12 +47,47 @@ export async function loadTrades(address: string) {
     trades.set(result.trades);
     tradesHasMore.set(result.hasMore);
     tradesIncomplete.set(result.incomplete);
+
+    // Auto-fetch remaining history in background
+    if (result.hasMore) {
+      loadAllRemainingTrades(thisGeneration);
+    }
   } catch (e: any) {
     if (thisGeneration !== loadGeneration) return;
     tradesError.set(e.message);
   } finally {
     if (thisGeneration === loadGeneration) {
       tradesLoading.set(false);
+    }
+  }
+}
+
+async function loadAllRemainingTrades(generation: number) {
+  while (get(tradesHasMore) && generation === loadGeneration && oldestTimestamp && currentAddress) {
+    const endTime = oldestTimestamp - 1;
+    const startTime = endTime - (7 * 24 * 60 * 60 * 1000);
+
+    try {
+      const result = await api.getTrades(currentAddress, startTime, endTime);
+
+      if (generation !== loadGeneration) return;
+
+      if (result.trades.length > 0) {
+        oldestTimestamp = Math.min(...result.trades.map(t => t.timestamp));
+
+        const existing = get(trades);
+        const existingIds = new Set(existing.map(t => t.id));
+        const newTrades = result.trades.filter(t => !existingIds.has(t.id));
+        trades.set([...existing, ...newTrades]);
+      }
+
+      tradesHasMore.set(result.hasMore && result.trades.length > 0);
+      if (result.incomplete) {
+        tradesIncomplete.set(true);
+      }
+    } catch {
+      // Stop background loading on error, don't spam retries
+      break;
     }
   }
 }
