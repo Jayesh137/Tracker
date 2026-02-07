@@ -18,7 +18,7 @@
     hasWallets
   } from './lib/stores/wallets';
   import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
-  import { trades, tradesLoading, loadTrades, resetTradesState } from './lib/stores/trades';
+  import { trades, tradesLoading, loadTrades, resetTradesState, tradesHasMore, tradesLoadingMore, tradesIncomplete, loadMoreTrades } from './lib/stores/trades';
   import { toast } from './lib/stores/toast';
 
   let activeTab: 'positions' | 'fills' = 'positions';
@@ -234,7 +234,14 @@
           </div>
         {/if}
       {:else}
-        <FillsList fills={$trades} loading={$tradesLoading} />
+        <FillsList
+          fills={$trades}
+          loading={$tradesLoading}
+          loadingMore={$tradesLoadingMore}
+          hasMore={$tradesHasMore}
+          incomplete={$tradesIncomplete}
+          onLoadMore={loadMoreTrades}
+        />
       {/if}
     </div>
   {/if}
