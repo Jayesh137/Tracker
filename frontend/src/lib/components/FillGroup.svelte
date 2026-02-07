@@ -6,7 +6,8 @@
   export let coin: string;
   export let fills: Trade[];
 
-  let expanded = false;
+  export let defaultExpanded: boolean = false;
+  let expanded = defaultExpanded;
 
   $: buyCount = fills.filter(f => f.side === 'buy').length;
   $: sellCount = fills.filter(f => f.side === 'sell').length;
