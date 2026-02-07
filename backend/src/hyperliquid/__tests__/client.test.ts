@@ -9,16 +9,21 @@ describe('HyperliquidClient', () => {
 
   describe('getPositions', () => {
     it('should fetch positions for a wallet', async () => {
-      const positions = await client.getPositions(TEST_WALLET);
-      expect(Array.isArray(positions)).toBe(true);
+      const result = await client.getPositions(TEST_WALLET);
+      expect(result).toHaveProperty('positions');
+      expect(result).toHaveProperty('account');
+      expect(Array.isArray(result.positions)).toBe(true);
     });
   });
 
   describe('getTrades', () => {
-    it('should fetch all trades for a wallet', async () => {
-      const trades = await client.getTrades(TEST_WALLET);
-      expect(Array.isArray(trades)).toBe(true);
-    });
+    it('should fetch trades for a wallet', async () => {
+      const result = await client.getTrades(TEST_WALLET);
+      expect(result).toHaveProperty('trades');
+      expect(result).toHaveProperty('hasMore');
+      expect(result).toHaveProperty('incomplete');
+      expect(Array.isArray(result.trades)).toBe(true);
+    }, 15000);
   });
 
   describe('transformPosition', () => {
