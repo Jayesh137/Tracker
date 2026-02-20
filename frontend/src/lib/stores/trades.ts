@@ -17,7 +17,9 @@ let oldestTimestamp: number | null = null;
 let loadGeneration = 0; // increments on each wallet switch to discard stale responses
 
 export async function loadTrades(address: string) {
-  tradesLoading.set(true);
+  if (isFirstLoad) {
+    tradesLoading.set(true);
+  }
   tradesError.set(null);
   currentAddress = address;
   const thisGeneration = loadGeneration;
@@ -40,17 +42,30 @@ export async function loadTrades(address: string) {
 
     if (result.trades.length > 0) {
       lastKnownTradeId = result.trades[0].id;
-      oldestTimestamp = Math.min(...result.trades.map(t => t.timestamp));
     }
 
-    isFirstLoad = false;
-    trades.set(result.trades);
-    tradesHasMore.set(result.hasMore);
-    tradesIncomplete.set(result.incomplete);
+    if (isFirstLoad) {
+      // First load: set trades directly, start background history fetch
+      if (result.trades.length > 0) {
+        oldestTimestamp = Math.min(...result.trades.map(t => t.timestamp));
+      }
+      trades.set(result.trades);
+      tradesHasMore.set(result.hasMore);
+      tradesIncomplete.set(result.incomplete);
+      isFirstLoad = false;
 
-    // Auto-fetch remaining history in background
-    if (result.hasMore) {
-      loadAllRemainingTrades(thisGeneration);
+      if (result.hasMore) {
+        loadAllRemainingTrades(thisGeneration);
+      }
+    } else {
+      // Subsequent polls: merge new trades into existing data to preserve history
+      const existing = get(trades);
+      const existingIds = new Set(existing.map(t => t.id));
+      const newTrades = result.trades.filter(t => !existingIds.has(t.id));
+
+      if (newTrades.length > 0) {
+        trades.set([...newTrades, ...existing]);
+      }
     }
   } catch (e: any) {
     if (thisGeneration !== loadGeneration) return;

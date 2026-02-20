@@ -13,6 +13,7 @@
   $: sellCount = fills.filter(f => f.side === 'sell').length;
   $: totalPnl = fills.reduce((sum, f) => sum + (f.closedPnl || 0), 0);
   $: totalVolume = fills.reduce((sum, f) => sum + f.size, 0);
+  $: totalDollarValue = fills.reduce((sum, f) => sum + f.size * f.price, 0);
   $: isProfit = totalPnl > 0;
   $: isLoss = totalPnl < 0;
 
@@ -39,6 +40,12 @@
     if (vol >= 1000) return vol.toLocaleString('en-US', { maximumFractionDigits: 1 });
     if (vol >= 1) return vol.toFixed(2);
     return vol.toFixed(4);
+  }
+
+  function formatDollarValue(val: number): string {
+    if (val >= 1_000_000) return '$' + (val / 1_000_000).toFixed(1) + 'M';
+    if (val >= 1000) return '$' + val.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return '$' + val.toFixed(2);
   }
 
   function formatDate(timestamp: number): string {
@@ -80,7 +87,7 @@
         </span>
       {/if}
       <span class="spacer"></span>
-      <span class="date">{dateRange}</span>
+      <span class="total-value">{formatDollarValue(totalDollarValue)}</span>
       <span class="chevron" class:open={expanded}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <polyline points="6 9 12 15 18 9"/>
@@ -88,12 +95,14 @@
       </span>
     </div>
     <div class="row-bottom">
-      <span class="stat">{fills.length} fills</span>
+      <span class="stat">{fills.length} fill{fills.length !== 1 ? 's' : ''}</span>
       <span class="stat-sep">·</span>
       <span class="stat">{formatVolume(totalVolume)} {coin}</span>
       <span class="stat-sep">·</span>
       <span class="stat buys">{buyCount}B</span>
       <span class="stat sells">{sellCount}S</span>
+      <span class="stat-sep">·</span>
+      <span class="stat date">{dateRange}</span>
       {#if totalPnl !== 0}
         <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
           {formatPnl(totalPnl)}
@@ -209,9 +218,12 @@
     flex: 1;
   }
 
-  .date {
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
+  .total-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 
   .chevron {
@@ -245,6 +257,7 @@
 
   .stat.buys { color: var(--green); font-weight: 500; }
   .stat.sells { color: var(--red); font-weight: 500; }
+  .stat.date { color: var(--text-tertiary); }
 
   .pnl {
     margin-left: auto;

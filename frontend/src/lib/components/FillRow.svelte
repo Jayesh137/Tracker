@@ -46,7 +46,6 @@
 <div class="fill-row" class:expanded on:click={() => expanded = !expanded}>
   <div class="summary">
     <span class="time">{formatTime(fill.timestamp)}</span>
-    <span class="coin">{fill.coin}</span>
     <span class="action" class:long={isLongPosition} class:short={isShortPosition}>
       {actionText}
     </span>
@@ -58,7 +57,7 @@
     <div class="details">
       <div class="detail-row">
         <span class="label">Size</span>
-        <span class="value">{fill.size} {fill.coin}</span>
+        <span class="value">{fill.size}</span>
       </div>
       <div class="detail-row">
         <span class="label">Price</span>
@@ -105,12 +104,6 @@
     font-size: 0.75rem;
     color: var(--text-secondary);
     min-width: 40px;
-  }
-
-  .coin {
-    font-weight: 500;
-    font-size: 0.875rem;
-    min-width: 50px;
   }
 
   .action {
