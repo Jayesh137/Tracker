@@ -12,7 +12,6 @@
   $: buyCount = fills.filter(f => f.side === 'buy').length;
   $: sellCount = fills.filter(f => f.side === 'sell').length;
   $: totalPnl = fills.reduce((sum, f) => sum + (f.closedPnl || 0), 0);
-  $: totalVolume = fills.reduce((sum, f) => sum + f.size, 0);
   $: totalDollarValue = fills.reduce((sum, f) => sum + f.size * f.price, 0);
   $: isProfit = totalPnl > 0;
   $: isLoss = totalPnl < 0;
@@ -34,12 +33,6 @@
     if (pnl === 0) return '—';
     const prefix = pnl > 0 ? '+' : '-';
     return prefix + '$' + Math.abs(pnl).toLocaleString('en-US', { maximumFractionDigits: 0 });
-  }
-
-  function formatVolume(vol: number): string {
-    if (vol >= 1000) return vol.toLocaleString('en-US', { maximumFractionDigits: 1 });
-    if (vol >= 1) return vol.toFixed(2);
-    return vol.toFixed(4);
   }
 
   function formatDollarValue(val: number): string {
@@ -97,12 +90,10 @@
     <div class="row-bottom">
       <span class="stat">{fills.length} fill{fills.length !== 1 ? 's' : ''}</span>
       <span class="stat-sep">·</span>
-      <span class="stat">{formatVolume(totalVolume)} {coin}</span>
-      <span class="stat-sep">·</span>
       <span class="stat buys">{buyCount}B</span>
       <span class="stat sells">{sellCount}S</span>
       <span class="stat-sep">·</span>
-      <span class="stat date">{dateRange}</span>
+      <span class="stat">{dateRange}</span>
       {#if totalPnl !== 0}
         <span class="pnl" class:profit={isProfit} class:loss={isLoss}>
           {formatPnl(totalPnl)}
@@ -257,7 +248,6 @@
 
   .stat.buys { color: var(--green); font-weight: 500; }
   .stat.sells { color: var(--red); font-weight: 500; }
-  .stat.date { color: var(--text-tertiary); }
 
   .pnl {
     margin-left: auto;
