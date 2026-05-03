@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
+import { addSSEClient, removeSSEClient } from './sse.js';
 import type { PushSubscription, IStorage } from './types/index.js';
 
 export function createRoutes(
@@ -105,6 +106,22 @@ export function createRoutes(
       console.error('Failed to fetch trades:', error.message);
       res.status(500).json({ error: 'Failed to fetch trades' });
     }
+  });
+
+  // SSE stream of live fills (instant UI updates while app is open)
+  router.get('/stream', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    const address = typeof req.query.address === 'string' ? req.query.address : null;
+    const client = addSSEClient(res, address);
+
+    res.write(`event: connected\ndata: ${JSON.stringify({ id: client.id })}\n\n`);
+
+    req.on('close', () => removeSSEClient(client));
   });
 
   // Subscribe to push notifications

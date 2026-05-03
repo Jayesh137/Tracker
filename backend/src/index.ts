@@ -11,6 +11,7 @@ import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
 import { formatTradeNotification } from './notifications/formatter.js';
 import { createRoutes } from './routes.js';
+import { addSSEClient, removeSSEClient, broadcastFill } from './sse.js';
 import type { HyperliquidFill, IStorage } from './types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -52,6 +53,9 @@ async function main() {
   // Handle incoming fills (trades)
   const handleFill = async (fill: HyperliquidFill, wallet: string) => {
     console.log(`[Fill] ${wallet} traded ${fill.sz} ${fill.coin} @ ${fill.px}`);
+
+    // Broadcast to any SSE clients (open frontend) for instant UI update
+    broadcastFill(fill, wallet, hlClient.transformFill(fill));
 
     const { title, body } = formatTradeNotification(fill, wallet);
     const subscriptions = storage.getPushSubscriptions();

@@ -10,12 +10,17 @@
   let showSuccess = false;
   let hasError = false;
 
+  $: cleanAddress = address.trim();
+  $: addressValid = /^0x[a-fA-F0-9]{40}$/.test(cleanAddress);
+  $: showAddressError = cleanAddress.length > 0 && !addressValid;
+
   async function handleSubmit() {
-    if (!name.trim() || !address.trim()) return;
+    if (!cleanAddress || !addressValid) return;
 
     hasError = false;
     isAdding = true;
-    const success = await addWallet(address.trim(), name.trim());
+    const finalName = name.trim() || `${cleanAddress.slice(0, 6)}…${cleanAddress.slice(-4)}`;
+    const success = await addWallet(cleanAddress, finalName);
 
     if (success) {
       showSuccess = true;
@@ -94,7 +99,7 @@
             id="name"
             type="text"
             bind:value={name}
-            placeholder="e.g. WhaleTrader"
+            placeholder="Optional — defaults to shortened address"
             disabled={isAdding}
             autocomplete="off"
           />
@@ -108,15 +113,19 @@
           <input
             id="address"
             type="text"
+            class:invalid={showAddressError}
             bind:value={address}
             placeholder="0x..."
             disabled={isAdding}
             autocomplete="off"
             spellcheck="false"
           />
+          {#if showAddressError}
+            <span class="field-error">Must be a 0x address (40 hex chars)</span>
+          {/if}
         </div>
 
-        <button type="submit" class="submit" disabled={isAdding || !name.trim() || !address.trim()}>
+        <button type="submit" class="submit" disabled={isAdding || !addressValid}>
           {#if isAdding}
             <span class="spinner"></span>
             Adding...
@@ -324,6 +333,16 @@
 
   input::placeholder {
     color: var(--text-tertiary);
+  }
+
+  input.invalid {
+    border-color: var(--red);
+  }
+
+  .field-error {
+    color: var(--red);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
   }
 
   .submit {

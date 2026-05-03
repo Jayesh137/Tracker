@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { streamConnected } from '../stores/liveStream';
   import type { AccountSummary } from '../types';
 
   export let account: AccountSummary | null;
@@ -16,7 +17,7 @@
     <div class="balance-main">
       <div class="label-row">
         <span class="label">Account Value</span>
-        <div class="live-dot" title="Live"></div>
+        <div class="live-dot" class:connected={$streamConnected} title={$streamConnected ? 'Live stream connected' : 'Polling only'}></div>
       </div>
       <span class="value">{formatUsd(account.accountValue)}</span>
     </div>
@@ -81,8 +82,12 @@
   .live-dot {
     width: 6px;
     height: 6px;
-    background: var(--green);
+    background: var(--text-tertiary);
     border-radius: 50%;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .live-dot.connected {
+    background: var(--green);
     animation: pulse 2s ease-in-out infinite;
     box-shadow: 0 0 6px var(--green-glow);
   }

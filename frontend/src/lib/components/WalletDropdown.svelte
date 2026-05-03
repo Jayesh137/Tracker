@@ -1,7 +1,8 @@
 <script lang="ts">
   import { wallets, selectedWallet } from '../stores/wallets';
+  import { copyToClipboard } from '../utils/clipboard';
   import type { Wallet } from '../types';
-  import { fly, fade } from 'svelte/transition';
+  import { fly } from 'svelte/transition';
 
   let isOpen = false;
   export let onAddWallet: () => void = () => {};
@@ -9,6 +10,15 @@
   function selectWallet(wallet: Wallet) {
     $selectedWallet = wallet;
     isOpen = false;
+  }
+
+  function shorten(addr: string): string {
+    return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  }
+
+  function copyAddress(e: MouseEvent, addr: string) {
+    e.stopPropagation();
+    copyToClipboard(addr, 'Address copied');
   }
 
   function handleClickOutside(event: MouseEvent) {
@@ -47,21 +57,28 @@
   {#if isOpen}
     <div class="menu" transition:fly={{ y: -8, duration: 150 }}>
       {#each $wallets as wallet, i (wallet.address)}
-        <button
-          class="item"
-          class:active={$selectedWallet?.address === wallet.address}
-          on:click|stopPropagation={() => selectWallet(wallet)}
-          style="animation-delay: {i * 20}ms"
-        >
-          <span class="check-container">
-            {#if $selectedWallet?.address === wallet.address}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            {/if}
-          </span>
-          <span class="wallet-name">{wallet.name}</span>
-        </button>
+        <div class="item-row" style="animation-delay: {i * 20}ms">
+          <button
+            class="item"
+            class:active={$selectedWallet?.address === wallet.address}
+            on:click|stopPropagation={() => selectWallet(wallet)}
+          >
+            <span class="check-container">
+              {#if $selectedWallet?.address === wallet.address}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              {/if}
+            </span>
+            <span class="wallet-meta">
+              <span class="wallet-name">{wallet.name || shorten(wallet.address)}</span>
+              <span class="wallet-addr">{shorten(wallet.address)}</span>
+            </span>
+          </button>
+          <button class="copy-btn" on:click={(e) => copyAddress(e, wallet.address)} aria-label="Copy address" title="Copy address">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+        </div>
       {/each}
 
       {#if $wallets.length > 0}
@@ -164,12 +181,18 @@
     box-shadow: var(--shadow-lg);
   }
 
+  .item-row {
+    display: flex;
+    align-items: stretch;
+    animation: fadeSlideIn 0.15s ease-out forwards;
+    opacity: 0;
+  }
   .item {
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    width: 100%;
-    padding: 0.75rem 1rem;
+    flex: 1;
+    padding: 0.625rem 0.75rem 0.625rem 1rem;
     background: transparent;
     border: none;
     color: var(--text-primary);
@@ -177,8 +200,32 @@
     cursor: pointer;
     text-align: left;
     transition: all var(--transition-fast);
-    animation: fadeSlideIn 0.15s ease-out forwards;
-    opacity: 0;
+  }
+  .copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    padding: 0 0.75rem;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+  .copy-btn:hover {
+    color: var(--accent);
+  }
+  .wallet-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+    flex: 1;
+  }
+  .wallet-addr {
+    font-size: 0.6875rem;
+    color: var(--text-tertiary);
+    font-family: 'SF Mono', monospace;
   }
 
   @keyframes fadeSlideIn {

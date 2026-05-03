@@ -101,38 +101,35 @@ export class HyperliquidClient {
 
   async getTrades(address: string, startTime?: number, endTime?: number): Promise<TradesResponse> {
     const now = Date.now();
-    const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000);
-    const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+    const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    const oldestAllowed = now - TWO_YEARS_MS;
 
-    // Default to last 7 days if no time params
-    const requestedStart = startTime ?? sevenDaysAgo;
+    // Determine if this is an initial load (no params at all)
+    const isInitialLoad = startTime === undefined && endTime === undefined;
+
+    // Defaults: initial load fetches the last 30 days via time-windowed endpoint
+    // (in addition to userFills which gives the latest 2000 across all time).
+    const requestedStart = startTime ?? (now - THIRTY_DAYS_MS);
     const requestedEnd = endTime ?? now;
-
-    // Clamp to 1 year ago max
-    const clampedStartTime = Math.max(requestedStart, oneYearAgo);
+    const clampedStartTime = Math.max(requestedStart, oldestAllowed);
 
     let incomplete = false;
     const allFills: HyperliquidFill[] = [];
 
-    // Determine if this is an initial load (no startTime provided)
-    const isInitialLoad = startTime === undefined;
-
     try {
-      // On initial load, use userFills (fast, returns 2000 most recent) from both DEXes
-      // On "Load More", use userFillsByTime for the specific time window
-      const promises: Promise<HyperliquidFill[]>[] = [];
+      const promises: Promise<HyperliquidFill[]>[] = [
+        // Always pull the time-windowed range from both DEXes.
+        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd),
+        this.fetchFillsForWindow(address, clampedStartTime, requestedEnd, 'xyz')
+      ];
 
       if (isInitialLoad) {
-        // userFills is faster and returns the most recent fills — sufficient for initial view
+        // Also pull userFills (the latest ~2000 fills across all time)
+        // so the recent view is populated even if the wallet has gaps.
         promises.push(
           this.fetchRecentFills(address),
           this.fetchRecentFills(address, 'xyz')
-        );
-      } else {
-        // For pagination, use time-windowed fetch with both DEXes
-        promises.push(
-          this.fetchFillsForWindow(address, clampedStartTime, requestedEnd),
-          this.fetchFillsForWindow(address, clampedStartTime, requestedEnd, 'xyz')
         );
       }
 
@@ -142,16 +139,16 @@ export class HyperliquidClient {
         if (result.status === 'fulfilled') {
           allFills.push(...result.value);
         } else {
-          console.error('Fill fetch error:', result.reason);
+          console.error('[Client] Fill fetch error:', result.reason);
           incomplete = true;
         }
       }
     } catch (error) {
-      console.error('Unexpected error fetching trades:', error);
+      console.error('[Client] Unexpected error fetching trades:', error);
       incomplete = true;
     }
 
-    // Deduplicate by tid
+    // Deduplicate by tid (trade id is unique across DEXes)
     const uniqueFills = new Map<number, HyperliquidFill>();
     for (const fill of allFills) {
       if (!uniqueFills.has(fill.tid)) {
@@ -159,15 +156,19 @@ export class HyperliquidClient {
       }
     }
 
-    // Filter to requested window
-    const filteredFills = Array.from(uniqueFills.values())
-      .filter(fill => fill.time >= clampedStartTime && fill.time <= requestedEnd);
+    // For initial load, return everything (including userFills data outside the
+    // 30-day window so older history shows up immediately). For windowed loads
+    // (Load More), restrict to the window so the frontend can accumulate.
+    const fills = Array.from(uniqueFills.values())
+      .filter(fill =>
+        isInitialLoad
+          ? fill.time <= requestedEnd
+          : fill.time >= clampedStartTime && fill.time <= requestedEnd
+      )
+      .sort((a, b) => b.time - a.time);
 
-    // Sort newest first
-    filteredFills.sort((a, b) => b.time - a.time);
-
-    const trades = filteredFills.map(fill => this.transformFill(fill));
-    const hasMore = clampedStartTime > oneYearAgo;
+    const trades = fills.map(fill => this.transformFill(fill));
+    const hasMore = clampedStartTime > oldestAllowed;
 
     return { trades, hasMore, incomplete };
   }
@@ -202,7 +203,7 @@ export class HyperliquidClient {
   ): Promise<HyperliquidFill[]> {
     const allFills: HyperliquidFill[] = [];
     let currentStart = startTime;
-    const maxIterations = 10;
+    const maxIterations = 30;
 
     for (let i = 0; i < maxIterations; i++) {
       const body: Record<string, unknown> = {

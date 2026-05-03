@@ -9,7 +9,6 @@ export class HyperliquidWebSocket {
   private ws: WebSocket | null = null;
   private subscriptions: Map<string, FillCallback> = new Map();
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
   private isConnecting = false;
@@ -130,18 +129,14 @@ export class HyperliquidWebSocket {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[WS] Max reconnection attempts reached');
-      return;
-    }
-
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+    // Retry forever — losing notifications because we gave up is worse than retrying.
+    const delay = Math.min(1000 * Math.pow(2, Math.min(this.reconnectAttempts, 8)), 30_000);
     this.reconnectAttempts++;
 
     console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimeout = setTimeout(() => {
-      this.connect().catch(console.error);
+      this.connect().catch(err => console.error('[WS] Reconnect failed:', err));
     }, delay);
   }
 

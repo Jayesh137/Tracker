@@ -1,8 +1,26 @@
 <script lang="ts">
   import type { Trade } from '../types';
+  import { copyToClipboard } from '../utils/clipboard';
 
   export let fill: Trade;
   let expanded = false;
+
+  function handleCopy(e: MouseEvent) {
+    e.stopPropagation();
+    const value = (fill.size * fill.price).toFixed(2);
+    const time = new Date(fill.timestamp).toLocaleString();
+    const lines = [
+      `${fill.coin} ${fill.direction || fill.side.toUpperCase()}`,
+      `Size: ${fill.size}`,
+      `Price: $${fill.price}`,
+      `Value: $${value}`,
+      fill.closedPnl != null && fill.closedPnl !== 0
+        ? `PnL: ${fill.closedPnl > 0 ? '+' : ''}$${fill.closedPnl.toFixed(2)}`
+        : '',
+      `Time: ${time}`
+    ].filter(Boolean);
+    copyToClipboard(lines.join('\n'), 'Trade copied');
+  }
 
   // Determine position type from direction (Open Long, Close Short, etc.)
   $: isLongPosition = fill.direction?.includes('Long') ?? fill.side === 'buy';
@@ -73,6 +91,10 @@
           <span class="value" class:profit={isProfit} class:loss={isLoss}>{formatPnl(fill.closedPnl)}</span>
         </div>
       {/if}
+      <button class="copy-trade" on:click={handleCopy}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy trade details
+      </button>
     </div>
   {/if}
 </div>
@@ -132,24 +154,6 @@
     margin-left: auto;
   }
 
-  .pnl {
-    font-size: 0.75rem;
-    font-weight: 600;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    text-align: right;
-  }
-
-  .pnl.profit {
-    color: var(--green);
-    background: rgba(34, 197, 94, 0.12);
-  }
-
-  .pnl.loss {
-    color: var(--red);
-    background: rgba(239, 68, 68, 0.12);
-  }
-
   .chevron {
     font-size: 0.625rem;
     color: var(--text-secondary);
@@ -190,5 +194,25 @@
 
   .value.loss {
     color: var(--red);
+  }
+
+  .copy-trade {
+    margin-top: 0.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    align-self: flex-start;
+    transition: all var(--transition-fast);
+  }
+  .copy-trade:hover {
+    color: var(--accent);
+    border-color: var(--accent);
   }
 </style>

@@ -18,7 +18,18 @@
     hasWallets
   } from './lib/stores/wallets';
   import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
-  import { trades, tradesLoading, loadTrades, resetTradesState, tradesHasMore, tradesIncomplete } from './lib/stores/trades';
+  import {
+    trades,
+    tradesLoading,
+    tradesBackfilling,
+    tradesLoadingMore,
+    loadTrades,
+    loadMoreTrades,
+    resetTradesState,
+    tradesHasMore,
+    tradesIncomplete
+  } from './lib/stores/trades';
+  import { connectStream, disconnectStream } from './lib/stores/liveStream';
   import { toast } from './lib/stores/toast';
 
   let activeTab: 'positions' | 'fills' = 'positions';
@@ -35,21 +46,21 @@
   onMount(() => {
     loadWallets();
 
+    // Positions still poll (mark prices change continuously); fills come via SSE.
     refreshInterval = setInterval(() => {
       if ($selectedWallet) {
         loadPositions($selectedWallet.address);
-        loadTrades($selectedWallet.address);
       }
-    }, 30000);
+    }, 15000);
 
-    // Reload data when app becomes visible (PWA resume from idle)
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadWallets();
-        if ($selectedWallet) {
-          loadPositions($selectedWallet.address);
-          loadTrades($selectedWallet.address);
-        }
+      if (document.visibilityState === 'visible' && $selectedWallet) {
+        loadPositions($selectedWallet.address);
+        loadTrades($selectedWallet.address);
+        connectStream($selectedWallet.address);
+      } else if (document.visibilityState === 'hidden') {
+        // Conserve battery — backend still sends push notifications
+        disconnectStream();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -57,6 +68,7 @@
     return () => {
       clearInterval(refreshInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      disconnectStream();
     };
   });
 
@@ -64,6 +76,7 @@
     resetTradesState();
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
+    connectStream($selectedWallet.address);
   }
 
   async function handleRefresh() {
@@ -237,8 +250,11 @@
         <FillsList
           fills={$trades}
           loading={$tradesLoading}
+          backfilling={$tradesBackfilling}
+          loadingMore={$tradesLoadingMore}
           hasMore={$tradesHasMore}
           incomplete={$tradesIncomplete}
+          onLoadMore={loadMoreTrades}
         />
       {/if}
     </div>
