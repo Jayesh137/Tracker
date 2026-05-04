@@ -317,7 +317,7 @@
             <FillGroup
               coin={group.coin}
               fills={group.fills}
-              defaultExpanded={allExpanded || section.coinGroups.length <= 2}
+              defaultExpanded={allExpanded}
             />
           {/each}
         </div>

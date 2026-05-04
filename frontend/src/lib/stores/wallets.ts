@@ -100,7 +100,17 @@ function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
     }
   }
 
-  return Array.from(merged.values());
+  return sortWallets(Array.from(merged.values()));
+}
+
+const PINNED_NAME = 'loracle';
+
+export function sortWallets(list: Wallet[]): Wallet[] {
+  return [...list].sort((a, b) => {
+    const aPinned = (a.name || '').toLowerCase() === PINNED_NAME ? 0 : 1;
+    const bPinned = (b.name || '').toLowerCase() === PINNED_NAME ? 0 : 1;
+    return aPinned - bPinned;
+  });
 }
 
 async function syncToBackendWithRetry(fn: () => Promise<any>): Promise<void> {
@@ -129,7 +139,7 @@ export async function loadWallets() {
   isLoading.set(true);
   error.set(null);
 
-  const localWallets = await loadWalletsFromStorage();
+  const localWallets = sortWallets(await loadWalletsFromStorage());
   if (localWallets.length > 0) {
     wallets.set(localWallets);
 
@@ -180,7 +190,7 @@ export async function addWallet(address: string, name: string) {
     return false;
   }
 
-  const updatedWallets = [...currentWallets, newWallet];
+  const updatedWallets = sortWallets([...currentWallets, newWallet]);
   wallets.set(updatedWallets);
   await saveWallets(updatedWallets);
   selectedWallet.set(newWallet);
@@ -224,9 +234,9 @@ export async function renameWallet(address: string, name: string) {
 
   let updatedWallets: Wallet[] = [];
   wallets.update(w => {
-    updatedWallets = w.map(wallet =>
+    updatedWallets = sortWallets(w.map(wallet =>
       wallet.address.toLowerCase() === normalizedAddress ? { ...wallet, name } : wallet
-    );
+    ));
     return updatedWallets;
   });
   await saveWallets(updatedWallets);
