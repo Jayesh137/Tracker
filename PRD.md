@@ -14,7 +14,7 @@ A Progressive Web App (PWA) that tracks Hyperliquid DEX wallets in real-time and
 ## Non-Goals
 
 - Auto-execute trades (too risky, out of scope)
-- Track more than 3 wallets (not needed for initial version)
+- Multi-user collaboration or public social features
 - Historical analytics or backtesting
 - Social features or sharing
 
@@ -48,7 +48,7 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 - Subscribe to `userFills` WebSocket channel for each tracked wallet
 - Detect trade within 1-2 seconds of on-chain execution
 - Handle WebSocket disconnects with auto-reconnect
-- Support monitoring 1-3 wallets simultaneously
+- Support monitoring up to 10 wallets simultaneously
 
 **Hyperliquid API:**
 - WebSocket endpoint: `wss://api.hyperliquid.xyz/ws`
@@ -87,7 +87,9 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
   - Action (open/close/reduce)
   - Coin, side, size, price
   - PnL for closes
-- Wallet selector dropdown (when tracking multiple)
+- Wallet selector and comparison strip (when tracking multiple)
+- Copy-readiness summary that turns positions, fills, orders, and TWAPs into an actionable status
+- Intent signals for open orders, TWAP slices, funding cost, and data dedupe state
 - Pull-to-refresh
 - Auto-refresh every 30 seconds
 
@@ -99,7 +101,7 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 - Add wallet by pasting Ethereum address (0x...)
 - Validate address format
 - Remove wallet with confirmation
-- Maximum 3 wallets
+- Maximum 10 wallets
 - Persist wallet list on server
 
 ### 5. PWA Installation
@@ -149,14 +151,14 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 
 ### Frontend
 
-**Stack:** Vanilla HTML/CSS/JavaScript (no framework)
+**Stack:** Svelte 5, Vite, TypeScript
 
 **Files:**
-- `index.html` - App shell
-- `app.js` - Dashboard logic, API calls
-- `styles.css` - Mobile-first responsive design
-- `manifest.json` - PWA manifest
-- `sw.js` - Service worker for push + offline
+- `src/App.svelte` - dashboard cockpit
+- `src/lib/components` - wallet, position, fills, insights, settings components
+- `src/lib/stores` - wallet, position, trade, insight, stream, and preference state
+- `src/app.css` - mobile-first responsive design
+- `vite.config.ts` - PWA manifest and service worker configuration
 
 **Browser Support:** Safari iOS 15+, Chrome, Firefox
 

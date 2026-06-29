@@ -47,6 +47,22 @@ export function broadcastHeartbeat(): void {
   }
 }
 
+export function broadcastWalletEvent(wallet: string, event: unknown): void {
+  const walletLower = wallet.toLowerCase();
+  const payload = JSON.stringify({ wallet: walletLower, event });
+  const message = `event: wallet-event\ndata: ${payload}\n\n`;
+
+  for (const client of clients) {
+    if (client.address === null || client.address === walletLower) {
+      try {
+        client.res.write(message);
+      } catch {
+        clients.delete(client);
+      }
+    }
+  }
+}
+
 export function getSSEClientCount(): number {
   return clients.size;
 }

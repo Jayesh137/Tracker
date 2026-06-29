@@ -1,4 +1,4 @@
-import type { HealthResponse, PositionsResponse, Wallet, TradesResponse } from '../types';
+import type { HealthResponse, PositionsResponse, Wallet, TradesResponse, WalletInsightsResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -53,6 +53,9 @@ export const api = {
     if (qs) url += `?${qs}`;
     return fetchJson<TradesResponse>(url);
   },
+
+  getWalletInsights: (address: string) =>
+    fetchJson<WalletInsightsResponse>(`/wallet/${address}/insights`),
 
   // Push notifications
   getVapidPublicKey: () =>

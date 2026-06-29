@@ -15,6 +15,35 @@ export interface HyperliquidFill {
   tid: number;
 }
 
+export interface HyperliquidOpenOrder {
+  coin: string;
+  isPositionTpsl?: boolean;
+  isTrigger?: boolean;
+  limitPx: string;
+  oid: number;
+  orderType?: string;
+  origSz?: string;
+  reduceOnly?: boolean;
+  side: 'B' | 'A';
+  sz: string;
+  timestamp: number;
+  triggerCondition?: string;
+  triggerPx?: string;
+}
+
+export interface HyperliquidTwapSliceFill {
+  fill: HyperliquidFill;
+  twapId: number;
+}
+
+export interface HyperliquidFunding {
+  time: number;
+  coin: string;
+  usdc: string;
+  szi: string;
+  fundingRate: string;
+}
+
 export interface HyperliquidPosition {
   coin: string;
   entryPx: string | null;
@@ -66,6 +95,43 @@ export interface Position {
   marginUsed: number;
 }
 
+export interface OpenOrderIntent {
+  id: string;
+  coin: string;
+  side: 'buy' | 'sell';
+  size: number;
+  price: number;
+  reduceOnly: boolean;
+  orderType: string;
+  timestamp: number;
+  notional: number;
+}
+
+export interface TwapInsight {
+  id: string;
+  coin: string;
+  side: 'buy' | 'sell';
+  executedSize: number;
+  averagePrice: number;
+  lastSliceTime: number;
+  sliceCount: number;
+}
+
+export interface FundingInsight {
+  coin: string;
+  totalUsdc: number;
+  latestRate: number;
+  latestTime: number;
+}
+
+export interface WalletInsightsResponse {
+  openOrders: OpenOrderIntent[];
+  twaps: TwapInsight[];
+  funding: FundingInsight[];
+  dedupeActive: boolean;
+  incomplete: boolean;
+}
+
 export interface Trade {
   id: string;
   coin: string;
@@ -82,6 +148,7 @@ export interface TradesResponse {
   trades: Trade[];
   hasMore: boolean;
   incomplete: boolean;
+  duplicateFillsRemoved?: number;
 }
 
 export interface PushSubscription {

@@ -6,8 +6,10 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
 
 - Real-time trade alerts via WebSocket
 - Push notifications (works when app is closed)
-- Dashboard showing open positions and recent trades
-- Track up to 3 wallets
+- Live cockpit showing positions, copy-readiness, intent signals, and fills
+- Wallet comparison for tracked traders
+- Open order, TWAP, funding, and dedupe insight signals
+- Track up to 10 wallets
 
 ## Local Development
 
@@ -80,7 +82,7 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
 
 - **Frontend**: Svelte 5, Vite, TypeScript, vite-plugin-pwa
 - **Backend**: Node.js, Express, TypeScript, ws, web-push
-- **API**: Hyperliquid REST & WebSocket
+- **API**: Hyperliquid REST, WebSocket, and server-sent events for live UI updates
 
 ## License
 

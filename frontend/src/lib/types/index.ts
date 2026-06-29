@@ -11,6 +11,43 @@ export interface Position {
   marginUsed: number;
 }
 
+export interface OpenOrderIntent {
+  id: string;
+  coin: string;
+  side: 'buy' | 'sell';
+  size: number;
+  price: number;
+  reduceOnly: boolean;
+  orderType: string;
+  timestamp: number;
+  notional: number;
+}
+
+export interface TwapInsight {
+  id: string;
+  coin: string;
+  side: 'buy' | 'sell';
+  executedSize: number;
+  averagePrice: number;
+  lastSliceTime: number;
+  sliceCount: number;
+}
+
+export interface FundingInsight {
+  coin: string;
+  totalUsdc: number;
+  latestRate: number;
+  latestTime: number;
+}
+
+export interface WalletInsightsResponse {
+  openOrders: OpenOrderIntent[];
+  twaps: TwapInsight[];
+  funding: FundingInsight[];
+  dedupeActive: boolean;
+  incomplete: boolean;
+}
+
 export interface AccountSummary {
   accountValue: number;
   totalMarginUsed: number;
@@ -38,6 +75,7 @@ export interface TradesResponse {
   trades: Trade[];
   hasMore: boolean;
   incomplete: boolean;
+  duplicateFillsRemoved?: number;
 }
 
 export interface PushSubscription {

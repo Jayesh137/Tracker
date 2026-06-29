@@ -1,24 +1,37 @@
 import type {
   HyperliquidClearinghouseState,
   HyperliquidFill,
+  HyperliquidFunding,
+  HyperliquidOpenOrder,
   HyperliquidPosition,
+  HyperliquidTwapSliceFill,
+  FundingInsight,
+  OpenOrderIntent,
   Position,
   PositionsResponse,
   AccountSummary,
   Trade,
-  TradesResponse
+  TradesResponse,
+  TwapInsight,
+  WalletInsightsResponse
 } from '../types/index.js';
 
 const API_URL = 'https://api.hyperliquid.xyz';
+const REQUEST_TIMEOUT_MS = 7_000;
 
 export class HyperliquidClient {
-  async getAllMids(dex?: string): Promise<Record<string, string>> {
-    const body: Record<string, string> = { type: 'allMids' };
-    if (dex) {
-      body.dex = dex;
+  private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
     }
+  }
 
-    const response = await fetch(`${API_URL}/info`, {
+  private async postInfo<T>(body: Record<string, unknown>): Promise<T> {
+    const response = await this.fetchWithTimeout(`${API_URL}/info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -28,13 +41,21 @@ export class HyperliquidClient {
       throw new Error(`Hyperliquid API error: ${response.status}`);
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
+  }
+
+  async getAllMids(dex?: string): Promise<Record<string, string>> {
+    const body: Record<string, string> = { type: 'allMids' };
+    if (dex) {
+      body.dex = dex;
+    }
+    return this.postInfo<Record<string, string>>(body);
   }
 
   async getPositions(address: string): Promise<PositionsResponse> {
     // Fetch positions and current prices in parallel (both default and xyz DEX)
-    const [defaultResponse, xyzResponse, defaultMids, xyzMids] = await Promise.all([
-      fetch(`${API_URL}/info`, {
+    const [defaultResponse, xyzResponse, defaultMidsResult, xyzMidsResult] = await Promise.all([
+      this.fetchWithTimeout(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -42,7 +63,7 @@ export class HyperliquidClient {
           user: address
         })
       }),
-      fetch(`${API_URL}/info`, {
+      this.fetchWithTimeout(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -50,13 +71,13 @@ export class HyperliquidClient {
           user: address,
           dex: 'xyz'
         })
-      }),
-      this.getAllMids(),
-      this.getAllMids('xyz')
+      }).catch(() => null),
+      this.getAllMids().catch(() => ({})),
+      this.getAllMids('xyz').catch(() => ({}))
     ]);
 
     // Merge mids from both DEXes
-    const mids = { ...defaultMids, ...xyzMids };
+    const mids = { ...defaultMidsResult, ...xyzMidsResult };
 
     if (!defaultResponse.ok) {
       throw new Error(`Hyperliquid API error: ${defaultResponse.status}`);
@@ -78,7 +99,7 @@ export class HyperliquidClient {
 
     // xyz DEX might not exist for all wallets, so handle gracefully
     let xyzPositions: Position[] = [];
-    if (xyzResponse.ok) {
+    if (xyzResponse?.ok) {
       const xyzData: HyperliquidClearinghouseState = await xyzResponse.json();
       if (xyzData.assetPositions) {
         xyzPositions = xyzData.assetPositions
@@ -148,11 +169,14 @@ export class HyperliquidClient {
       incomplete = true;
     }
 
-    // Deduplicate by tid (trade id is unique across DEXes)
-    const uniqueFills = new Map<number, HyperliquidFill>();
+    const uniqueFills = new Map<string, HyperliquidFill>();
+    let duplicateFillsRemoved = 0;
     for (const fill of allFills) {
-      if (!uniqueFills.has(fill.tid)) {
-        uniqueFills.set(fill.tid, fill);
+      const key = this.fillKey(fill);
+      if (!uniqueFills.has(key)) {
+        uniqueFills.set(key, fill);
+      } else {
+        duplicateFillsRemoved++;
       }
     }
 
@@ -170,7 +194,47 @@ export class HyperliquidClient {
     const trades = fills.map(fill => this.transformFill(fill));
     const hasMore = clampedStartTime > oldestAllowed;
 
-    return { trades, hasMore, incomplete };
+    return { trades, hasMore, incomplete, duplicateFillsRemoved };
+  }
+
+  async getWalletInsights(address: string): Promise<WalletInsightsResponse> {
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    let incomplete = false;
+
+    const [defaultOrders, xyzOrders, twapSlices, funding] = await Promise.allSettled([
+      this.fetchOpenOrders(address),
+      this.fetchOpenOrders(address, 'xyz'),
+      this.fetchTwapSliceFills(address),
+      this.fetchFunding(address, sevenDaysAgo, now)
+    ]);
+
+    const orders: HyperliquidOpenOrder[] = [];
+    if (defaultOrders.status === 'fulfilled') orders.push(...defaultOrders.value);
+    else incomplete = true;
+    if (xyzOrders.status === 'fulfilled') orders.push(...xyzOrders.value);
+
+    let twaps: TwapInsight[] = [];
+    if (twapSlices.status === 'fulfilled') {
+      twaps = this.transformTwapSlices(twapSlices.value);
+    } else {
+      incomplete = true;
+    }
+
+    let fundingInsights: FundingInsight[] = [];
+    if (funding.status === 'fulfilled') {
+      fundingInsights = this.transformFunding(funding.value);
+    } else {
+      incomplete = true;
+    }
+
+    return {
+      openOrders: orders.map(order => this.transformOpenOrder(order)),
+      twaps,
+      funding: fundingInsights,
+      dedupeActive: true,
+      incomplete
+    };
   }
 
   private async fetchRecentFills(address: string, dex?: string): Promise<HyperliquidFill[]> {
@@ -182,7 +246,7 @@ export class HyperliquidClient {
       body.dex = dex;
     }
 
-    const response = await fetch(`${API_URL}/info`, {
+    const response = await this.fetchWithTimeout(`${API_URL}/info`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
@@ -193,6 +257,31 @@ export class HyperliquidClient {
     }
 
     return response.json();
+  }
+
+  private async fetchOpenOrders(address: string, dex?: string): Promise<HyperliquidOpenOrder[]> {
+    const body: Record<string, unknown> = {
+      type: 'openOrders',
+      user: address
+    };
+    if (dex) body.dex = dex;
+    return this.postInfo<HyperliquidOpenOrder[]>(body);
+  }
+
+  private async fetchTwapSliceFills(address: string): Promise<HyperliquidTwapSliceFill[]> {
+    return this.postInfo<HyperliquidTwapSliceFill[]>({
+      type: 'userTwapSliceFills',
+      user: address
+    });
+  }
+
+  private async fetchFunding(address: string, startTime: number, endTime: number): Promise<HyperliquidFunding[]> {
+    return this.postInfo<HyperliquidFunding[]>({
+      type: 'userFunding',
+      user: address,
+      startTime,
+      endTime
+    });
   }
 
   private async fetchFillsForWindow(
@@ -216,7 +305,7 @@ export class HyperliquidClient {
         body.dex = dex;
       }
 
-      const response = await fetch(`${API_URL}/info`, {
+      const response = await this.fetchWithTimeout(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -290,5 +379,74 @@ export class HyperliquidClient {
       fee: parseFloat(fill.fee),
       timestamp: fill.time
     };
+  }
+
+  private fillKey(fill: HyperliquidFill): string {
+    return `${fill.time}:${fill.coin}:${fill.tid}`;
+  }
+
+  private transformOpenOrder(order: HyperliquidOpenOrder): OpenOrderIntent {
+    const size = parseFloat(order.sz || order.origSz || '0') || 0;
+    const price = parseFloat(order.limitPx) || 0;
+    return {
+      id: `${order.oid}`,
+      coin: order.coin,
+      side: order.side === 'B' ? 'buy' : 'sell',
+      size,
+      price,
+      reduceOnly: Boolean(order.reduceOnly),
+      orderType: order.orderType || (order.isTrigger ? 'trigger' : 'limit'),
+      timestamp: order.timestamp,
+      notional: size * price
+    };
+  }
+
+  private transformTwapSlices(slices: HyperliquidTwapSliceFill[]): TwapInsight[] {
+    const grouped = new Map<number, HyperliquidFill[]>();
+    for (const slice of slices) {
+      const existing = grouped.get(slice.twapId) || [];
+      existing.push(slice.fill);
+      grouped.set(slice.twapId, existing);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([id, fills]) => {
+        const executedSize = fills.reduce((sum, fill) => sum + (parseFloat(fill.sz) || 0), 0);
+        const notional = fills.reduce((sum, fill) => sum + ((parseFloat(fill.sz) || 0) * (parseFloat(fill.px) || 0)), 0);
+        const lastSlice = fills.reduce((latest, fill) => fill.time > latest.time ? fill : latest, fills[0]);
+        return {
+          id: `${id}`,
+          coin: lastSlice.coin,
+          side: lastSlice.side === 'B' ? 'buy' as const : 'sell' as const,
+          executedSize,
+          averagePrice: executedSize > 0 ? notional / executedSize : 0,
+          lastSliceTime: Math.max(...fills.map(fill => fill.time)),
+          sliceCount: fills.length
+        };
+      })
+      .sort((a, b) => b.lastSliceTime - a.lastSliceTime)
+      .slice(0, 5);
+  }
+
+  private transformFunding(events: HyperliquidFunding[]): FundingInsight[] {
+    const grouped = new Map<string, HyperliquidFunding[]>();
+    for (const event of events) {
+      const existing = grouped.get(event.coin) || [];
+      existing.push(event);
+      grouped.set(event.coin, existing);
+    }
+
+    return Array.from(grouped.entries())
+      .map(([coin, coinEvents]) => {
+        const latest = coinEvents.reduce((current, event) => event.time > current.time ? event : current, coinEvents[0]);
+        return {
+          coin,
+          totalUsdc: coinEvents.reduce((sum, event) => sum + (parseFloat(event.usdc) || 0), 0),
+          latestRate: parseFloat(latest.fundingRate) || 0,
+          latestTime: latest.time
+        };
+      })
+      .sort((a, b) => Math.abs(b.totalUsdc) - Math.abs(a.totalUsdc))
+      .slice(0, 5);
   }
 }

@@ -4,10 +4,12 @@ import type { HyperliquidFill } from '../types/index.js';
 const WS_URL = 'wss://api.hyperliquid.xyz/ws';
 
 type FillCallback = (fill: HyperliquidFill, wallet: string) => void;
+type WalletEventCallback = (event: unknown, wallet: string) => void;
 
 export class HyperliquidWebSocket {
   private ws: WebSocket | null = null;
   private subscriptions: Map<string, FillCallback> = new Map();
+  private eventSubscriptions: Map<string, WalletEventCallback> = new Map();
   private reconnectAttempts = 0;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private pingInterval: NodeJS.Timeout | null = null;
@@ -75,12 +77,19 @@ export class HyperliquidWebSocket {
           callback(fill, wallet);
         }
       }
+    } else if ((data.channel === 'userEvents' || data.channel === 'userFundings') && data.data) {
+      const wallet = data.data.user?.toLowerCase();
+      const callback = this.eventSubscriptions.get(wallet);
+      if (callback) {
+        callback(data.data, wallet);
+      }
     }
   }
 
-  subscribeToWallet(address: string, callback: FillCallback): void {
+  subscribeToWallet(address: string, callback: FillCallback, eventCallback?: WalletEventCallback): void {
     const normalized = address.toLowerCase();
     this.subscriptions.set(normalized, callback);
+    if (eventCallback) this.eventSubscriptions.set(normalized, eventCallback);
 
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.sendSubscription(normalized);
@@ -90,6 +99,7 @@ export class HyperliquidWebSocket {
   unsubscribeFromWallet(address: string): void {
     const normalized = address.toLowerCase();
     this.subscriptions.delete(normalized);
+    this.eventSubscriptions.delete(normalized);
 
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.sendUnsubscription(normalized);
@@ -97,28 +107,38 @@ export class HyperliquidWebSocket {
   }
 
   private sendSubscription(address: string): void {
-    const message = {
-      method: 'subscribe',
-      subscription: {
-        type: 'userFills',
-        user: address
-      }
-    };
-
     console.log(`[WS] Subscribing to ${address}`);
-    this.ws?.send(JSON.stringify(message));
+    this.send({
+      method: 'subscribe',
+      subscription: { type: 'userFills', user: address }
+    });
+    this.send({
+      method: 'subscribe',
+      subscription: { type: 'userEvents', user: address }
+    });
+    this.send({
+      method: 'subscribe',
+      subscription: { type: 'userFundings', user: address }
+    });
   }
 
   private sendUnsubscription(address: string): void {
-    const message = {
-      method: 'unsubscribe',
-      subscription: {
-        type: 'userFills',
-        user: address
-      }
-    };
-
     console.log(`[WS] Unsubscribing from ${address}`);
+    this.send({
+      method: 'unsubscribe',
+      subscription: { type: 'userFills', user: address }
+    });
+    this.send({
+      method: 'unsubscribe',
+      subscription: { type: 'userEvents', user: address }
+    });
+    this.send({
+      method: 'unsubscribe',
+      subscription: { type: 'userFundings', user: address }
+    });
+  }
+
+  private send(message: unknown): void {
     this.ws?.send(JSON.stringify(message));
   }
 
@@ -162,6 +182,7 @@ export class HyperliquidWebSocket {
     this.stopPing();
     this.ws?.close();
     this.subscriptions.clear();
+    this.eventSubscriptions.clear();
   }
 
   isConnected(): boolean {

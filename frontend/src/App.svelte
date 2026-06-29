@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fade, fly, slide } from 'svelte/transition';
+  import { fade, slide } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
-  import TabBar from './lib/components/TabBar.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
+  import WalletInsights from './lib/components/WalletInsights.svelte';
+  import CopyReadiness from './lib/components/CopyReadiness.svelte';
+  import WalletComparison from './lib/components/WalletComparison.svelte';
   import PositionChanges from './lib/components/PositionChanges.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
@@ -24,7 +26,8 @@
     positionsError,
     loadPositions,
     accountSummary,
-    positionChanges
+    positionChanges,
+    positionsLastUpdated
   } from './lib/stores/positions';
   import {
     trades,
@@ -38,10 +41,18 @@
     tradesIncomplete,
     tradesError
   } from './lib/stores/trades';
+  import {
+    walletInsights,
+    walletInsightsLoading,
+    walletInsightsError,
+    loadWalletInsights,
+    resetWalletInsights
+  } from './lib/stores/walletInsights';
   import { connectStream, disconnectStream } from './lib/stores/liveStream';
+  import { compactMode } from './lib/stores/preferences';
   import { toast } from './lib/stores/toast';
+  import type { Wallet } from './lib/types';
 
-  let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
   let showSettings = false;
   let refreshInterval: ReturnType<typeof setInterval>;
@@ -67,6 +78,7 @@
       if (document.visibilityState === 'visible' && $selectedWallet) {
         loadPositions($selectedWallet.address);
         loadTrades($selectedWallet.address);
+        loadWalletInsights($selectedWallet.address);
         connectStream($selectedWallet.address);
       } else if (document.visibilityState === 'hidden') {
         // Conserve battery — backend still sends push notifications
@@ -85,8 +97,10 @@
   $: if ($selectedWallet && $selectedWallet.address !== loadedWalletAddress) {
     loadedWalletAddress = $selectedWallet.address;
     resetTradesState();
+    resetWalletInsights();
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
+    loadWalletInsights($selectedWallet.address);
     connectStream($selectedWallet.address);
   }
 
@@ -96,7 +110,8 @@
 
     await Promise.all([
       loadPositions($selectedWallet.address),
-      loadTrades($selectedWallet.address)
+      loadTrades($selectedWallet.address),
+      loadWalletInsights($selectedWallet.address)
     ]);
 
     isRefreshing = false;
@@ -108,9 +123,13 @@
       toast.success(`Removed ${name}`);
     }
   }
+
+  function handleSelectWallet(wallet: Wallet) {
+    $selectedWallet = wallet;
+  }
 </script>
 
-<div class="app">
+<div class="app" class:compact={$compactMode}>
   <Toast />
 
   <Header
@@ -201,14 +220,34 @@
     </div>
 
   {:else}
-    <TabBar bind:activeTab />
-    {#if activeTab === 'positions'}
-      <AccountBalance account={$accountSummary} />
-    {/if}
+    <AccountBalance account={$accountSummary} />
 
     <div class="content">
-      {#if activeTab === 'positions'}
-        <PositionChanges changes={$positionChanges} />
+      <WalletComparison
+        wallets={$wallets}
+        selectedAddress={$selectedWallet?.address ?? null}
+        on:select={(event) => handleSelectWallet(event.detail)}
+      />
+
+      <CopyReadiness
+        positions={$positions}
+        trades={$trades}
+        insights={$walletInsights}
+        lastUpdated={$positionsLastUpdated}
+      />
+
+      <PositionChanges changes={$positionChanges} />
+
+      <section class="dashboard-section">
+        <div class="dashboard-heading">
+          <div>
+            <span>Positions</span>
+            <h2>Open exposure</h2>
+          </div>
+          <button class="refresh-btn" on:click={handleRefresh} disabled={isRefreshing}>
+            {isRefreshing ? 'Refreshing' : 'Refresh'}
+          </button>
+        </div>
 
         {#if $positions.length > 0 || positionSearch}
           <div class="search-bar">
@@ -240,17 +279,18 @@
             <button class="retry-btn" on:click={() => $selectedWallet && loadPositions($selectedWallet.address)}>Retry</button>
           </div>
         {:else if $positions.length === 0}
-          <div class="empty-positions">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <div class="empty-positions compact-card">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <path d="M3 9h18"/>
               <path d="M9 21V9"/>
             </svg>
-            <p>No open positions</p>
+            <p>Wallet is flat</p>
+            <span>No open positions right now.</span>
           </div>
         {:else if filteredPositions.length === 0}
-          <div class="empty-positions">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <div class="empty-positions compact-card">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="11" cy="11" r="8"/>
               <path d="m21 21-4.35-4.35"/>
               <path d="M8 8l6 6"/>
@@ -266,7 +306,21 @@
             {/each}
           </div>
         {/if}
-      {:else}
+      </section>
+
+      <WalletInsights
+        insights={$walletInsights}
+        loading={$walletInsightsLoading}
+        error={$walletInsightsError}
+      />
+
+      <section class="dashboard-section">
+        <div class="dashboard-heading">
+          <div>
+            <span>Fills</span>
+            <h2>Execution history</h2>
+          </div>
+        </div>
         <FillsList
           fills={$trades}
           loading={$tradesLoading}
@@ -277,7 +331,7 @@
           error={$tradesError}
           onLoadMore={loadMoreTrades}
         />
-      {/if}
+      </section>
     </div>
   {/if}
 </div>
@@ -302,6 +356,47 @@
     padding-bottom: calc(1rem + var(--safe-bottom, 0px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .dashboard-section {
+    margin-bottom: 1rem;
+  }
+
+  .dashboard-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .dashboard-heading span {
+    color: var(--text-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .dashboard-heading h2 {
+    margin: 0.125rem 0 0;
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+
+  .refresh-btn {
+    padding: 0.4375rem 0.625rem;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .refresh-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: var(--accent);
   }
 
   .search-bar {
@@ -401,6 +496,19 @@
   .empty-positions p {
     margin: 0;
     font-size: 0.9375rem;
+  }
+
+  .empty-positions span {
+    color: var(--text-tertiary);
+    font-size: 0.8125rem;
+    margin-top: 0.25rem;
+  }
+
+  .compact-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 2rem 1rem;
   }
 
   .error-state {
@@ -647,5 +755,13 @@
   .remove-btn:hover {
     color: var(--red);
     background: var(--red-dim);
+  }
+
+  .compact .content {
+    padding: 0.75rem;
+  }
+
+  .compact .positions-grid {
+    gap: 0.5rem;
   }
 </style>

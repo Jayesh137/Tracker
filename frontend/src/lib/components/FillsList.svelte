@@ -11,6 +11,10 @@
   export let error: string | null = null;
   export let onLoadMore: (() => void) | null = null;
 
+  type FilterMode = 'all' | 'opens' | 'closes' | 'profitable' | 'large';
+  let filterMode: FilterMode = 'all';
+  let coinFilter = '';
+
   interface CoinGroup {
     coin: string;
     direction: string;
@@ -25,7 +29,8 @@
     coinGroups: CoinGroup[];
   }
 
-  $: daySections = groupByDay(fills);
+  $: filteredFills = applyFilters(fills, filterMode, coinFilter);
+  $: daySections = groupByDay(filteredFills);
 
   function getDayLabel(timestamp: number): string {
     const date = new Date(timestamp);
@@ -89,12 +94,24 @@
       })
       .sort((a, b) => b.fills[0].timestamp - a.fills[0].timestamp);
   }
+
+  function applyFilters(items: Trade[], mode: FilterMode, coin: string): Trade[] {
+    const normalizedCoin = coin.trim().toLowerCase();
+    return items.filter(fill => {
+      if (normalizedCoin && !fill.coin.toLowerCase().includes(normalizedCoin)) return false;
+      if (mode === 'opens') return fill.direction?.toLowerCase().includes('open');
+      if (mode === 'closes') return fill.direction?.toLowerCase().includes('close');
+      if (mode === 'profitable') return (fill.closedPnl ?? 0) > 0;
+      if (mode === 'large') return fill.size * fill.price >= 10_000;
+      return true;
+    });
+  }
 </script>
 
 <div class="fills-list">
   {#if incomplete}
     <div class="warning-banner">
-      Some fills may be missing — Hyperliquid returned an error for part of the range
+      Some fills may be missing - Hyperliquid returned an error for part of the range
     </div>
   {/if}
 
@@ -104,8 +121,29 @@
       <span>{error}</span>
     </div>
   {:else if fills.length === 0 && !loading}
-    <p class="empty">No fills found for this wallet</p>
+    <p class="empty">No fills in the loaded range</p>
   {:else}
+    <div class="filters">
+      <div class="filter-buttons" aria-label="Fill filters">
+        <button class:active={filterMode === 'all'} on:click={() => filterMode = 'all'}>All</button>
+        <button class:active={filterMode === 'opens'} on:click={() => filterMode = 'opens'}>Opens</button>
+        <button class:active={filterMode === 'closes'} on:click={() => filterMode = 'closes'}>Closes</button>
+        <button class:active={filterMode === 'profitable'} on:click={() => filterMode = 'profitable'}>Wins</button>
+        <button class:active={filterMode === 'large'} on:click={() => filterMode = 'large'}>Large</button>
+      </div>
+      <label class="coin-filter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input bind:value={coinFilter} placeholder="Coin" autocomplete="off" spellcheck="false" />
+      </label>
+    </div>
+
+    {#if filteredFills.length === 0}
+      <p class="empty compact-empty">No fills match the current filters</p>
+    {/if}
+
     {#each daySections as section (section.dateKey)}
       <div class="day-section">
         <div class="day-header">
@@ -145,12 +183,74 @@
 </div>
 
 <style>
-  .fills-list { display: flex; flex-direction: column; }
+  .fills-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 92px;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .filter-buttons {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding: 0.25rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+
+  .filter-buttons button {
+    min-width: 0;
+    padding: 0.5rem 0.25rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .filter-buttons button.active {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+  }
+
+  .coin-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-width: 0;
+    padding: 0 0.625rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-tertiary);
+  }
+
+  .coin-filter input {
+    min-width: 0;
+    width: 100%;
+    padding: 0.5rem 0;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+  }
+
+  .coin-filter input:focus {
+    box-shadow: none;
+  }
 
   .warning-banner {
-    background: rgba(234, 179, 8, 0.1);
-    border: 1px solid rgba(234, 179, 8, 0.3);
-    color: #eab308;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: var(--amber);
     font-size: 0.75rem;
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius-md);
@@ -158,7 +258,10 @@
     text-align: center;
   }
 
-  .day-section { margin-bottom: 0.5rem; }
+  .day-section {
+    margin-bottom: 0.5rem;
+  }
+
   .day-header {
     display: flex;
     align-items: center;
@@ -168,6 +271,7 @@
     z-index: 5;
     background: var(--bg-primary);
   }
+
   .day-label {
     font-size: 0.8125rem;
     font-weight: 700;
@@ -176,7 +280,10 @@
     letter-spacing: 0.04em;
   }
 
-  .day-fills { display: flex; flex-direction: column; }
+  .day-fills {
+    display: flex;
+    flex-direction: column;
+  }
 
   .empty {
     color: var(--text-secondary);
@@ -184,6 +291,10 @@
     padding: 3rem 1rem;
     margin: 0;
     font-size: 0.875rem;
+  }
+
+  .compact-empty {
+    padding: 1.25rem 1rem;
   }
 
   .empty.error {
@@ -203,7 +314,12 @@
     font-size: 0.75rem;
   }
 
-  .load-more { padding: 1rem 0 0.5rem; display: flex; justify-content: center; }
+  .load-more {
+    padding: 1rem 0 0.5rem;
+    display: flex;
+    justify-content: center;
+  }
+
   .load-more-btn {
     display: flex;
     align-items: center;
@@ -220,12 +336,17 @@
     width: 100%;
     justify-content: center;
   }
+
   .load-more-btn:hover:not(:disabled) {
     background: var(--bg-card-hover);
     border-color: var(--accent);
     color: var(--text-primary);
   }
-  .load-more-btn:disabled { cursor: not-allowed; opacity: 0.7; }
+
+  .load-more-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
 
   .loading-history {
     display: flex;
@@ -245,7 +366,6 @@
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
   }
-  @keyframes spin { to { transform: rotate(360deg); } }
 
   .history-end {
     color: var(--text-tertiary);
@@ -253,5 +373,23 @@
     padding: 1rem;
     margin: 0;
     font-size: 0.75rem;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  :global(.compact) .filters {
+    grid-template-columns: 1fr;
+  }
+
+  :global(.compact) .day-header {
+    padding-top: 0.5rem;
+  }
+
+  @media (max-width: 380px) {
+    .filters {
+      grid-template-columns: 1fr;
+    }
   }
 </style>

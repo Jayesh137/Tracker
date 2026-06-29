@@ -111,6 +111,19 @@ export function createRoutes(
     }
   });
 
+  // Get wallet accuracy insights: orders, TWAPs, funding, and dedupe health
+  router.get('/wallet/:address/insights', async (req: Request, res: Response) => {
+    const { address } = req.params;
+
+    try {
+      const result = await hlClient.getWalletInsights(address);
+      res.json(result);
+    } catch (error: any) {
+      console.error('Failed to fetch wallet insights:', error.message);
+      res.status(500).json({ error: 'Failed to fetch wallet insights' });
+    }
+  });
+
   // SSE stream of live fills (instant UI updates while app is open)
   router.get('/stream', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');

@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { ingestLiveTrade } from './trades';
 import { loadPositions } from './positions';
+import { loadWalletInsights } from './walletInsights';
 import type { Trade } from '../types';
 
 export const streamConnected = writable(false);
@@ -50,6 +51,16 @@ export function connectStream(address: string) {
         ingestLiveTrade(data.trade);
         // Position sizes change on fills — refresh in background
         loadPositions(currentAddress).catch(() => {});
+      }
+    } catch {}
+  });
+
+  eventSource.addEventListener('wallet-event', (event) => {
+    try {
+      const data = JSON.parse((event as MessageEvent).data) as { wallet: string };
+      if (data.wallet?.toLowerCase() === currentAddress) {
+        loadPositions(currentAddress).catch(() => {});
+        loadWalletInsights(currentAddress).catch(() => {});
       }
     } catch {}
   });

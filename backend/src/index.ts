@@ -11,7 +11,7 @@ import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
 import { formatTradeNotification } from './notifications/formatter.js';
 import { createRoutes } from './routes.js';
-import { addSSEClient, removeSSEClient, broadcastFill } from './sse.js';
+import { broadcastFill, broadcastWalletEvent } from './sse.js';
 import type { HyperliquidFill, IStorage } from './types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,9 +80,13 @@ async function main() {
     }
   };
 
+  const handleWalletEvent = (event: unknown, wallet: string) => {
+    broadcastWalletEvent(wallet, event);
+  };
+
   // Subscribe to existing wallets
   const subscribeToWallet = (address: string) => {
-    hlWebSocket.subscribeToWallet(address, handleFill);
+    hlWebSocket.subscribeToWallet(address, handleFill, handleWalletEvent);
   };
 
   const unsubscribeFromWallet = (address: string) => {
