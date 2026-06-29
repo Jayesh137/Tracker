@@ -41,30 +41,13 @@
     }
   }
 
-  function handleOverlayKeydown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  }
-
   $: canAdd = $wallets.length < 10;
   $: walletCount = $wallets.length;
 </script>
 
 <svelte:window on:keydown={handleKeydown} />
 
-<div
-  class="overlay"
-  transition:fade={{ duration: 150 }}
-  on:click={onClose}
-  on:keydown={handleOverlayKeydown}
-  role="dialog"
-  aria-modal="true"
-  tabindex="-1"
->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div class="overlay" transition:fade={{ duration: 150 }} on:click={onClose} role="dialog" aria-modal="true">
   <div
     class="modal"
     class:error={hasError}

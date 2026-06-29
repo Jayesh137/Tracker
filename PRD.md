@@ -14,7 +14,7 @@ A Progressive Web App (PWA) that tracks Hyperliquid DEX wallets in real-time and
 ## Non-Goals
 
 - Auto-execute trades (too risky, out of scope)
-- Multi-user account management
+- Track more than 3 wallets (not needed for initial version)
 - Historical analytics or backtesting
 - Social features or sharing
 
@@ -48,7 +48,7 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 - Subscribe to `userFills` WebSocket channel for each tracked wallet
 - Detect trade within 1-2 seconds of on-chain execution
 - Handle WebSocket disconnects with auto-reconnect
-- Support monitoring up to 10 wallets simultaneously
+- Support monitoring 1-3 wallets simultaneously
 
 **Hyperliquid API:**
 - WebSocket endpoint: `wss://api.hyperliquid.xyz/ws`
@@ -99,7 +99,7 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 - Add wallet by pasting Ethereum address (0x...)
 - Validate address format
 - Remove wallet with confirmation
-- Maximum 10 wallets
+- Maximum 3 wallets
 - Persist wallet list on server
 
 ### 5. PWA Installation

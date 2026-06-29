@@ -1,7 +1,6 @@
-import { writable, derived, get } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import { get as idbGet, set as idbSet, del as idbDel } from 'idb-keyval';
 import { api } from '../api/client';
-import { pinnedWalletSet, togglePinnedWallet as togglePinnedPreference } from './preferences';
 import type { Wallet } from '../types';
 
 const WALLETS_IDB_KEY = 'hl-tracker-wallets';
@@ -104,13 +103,13 @@ function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
   return sortWallets(Array.from(merged.values()));
 }
 
+const PINNED_NAME = 'loracle';
+
 export function sortWallets(list: Wallet[]): Wallet[] {
-  const pinned = get(pinnedWalletSet);
   return [...list].sort((a, b) => {
-    const aPinned = pinned.has(a.address.toLowerCase()) ? 0 : 1;
-    const bPinned = pinned.has(b.address.toLowerCase()) ? 0 : 1;
-    if (aPinned !== bPinned) return aPinned - bPinned;
-    return (a.name || a.address).localeCompare(b.name || b.address);
+    const aPinned = (a.name || '').toLowerCase() === PINNED_NAME ? 0 : 1;
+    const bPinned = (b.name || '').toLowerCase() === PINNED_NAME ? 0 : 1;
+    return aPinned - bPinned;
   });
 }
 
@@ -252,16 +251,6 @@ export async function renameWallet(address: string, name: string) {
   syncToBackendWithRetry(() => api.renameWallet(address, name));
 
   return true;
-}
-
-export async function togglePinnedWallet(address: string) {
-  togglePinnedPreference(address);
-  let sorted: Wallet[] = [];
-  wallets.update(w => {
-    sorted = sortWallets(w);
-    return sorted;
-  });
-  await saveWallets(sorted);
 }
 
 // Persist selected wallet on change

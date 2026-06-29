@@ -7,12 +7,7 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
 - Real-time trade alerts via WebSocket
 - Push notifications (works when app is closed)
 - Dashboard showing open positions and recent trades
-- Track up to 10 wallets
-- Wallet health/status indicators
-- Fill filters by notional, action, side, and coin watchlist
-- Copy-trade summaries for fast manual execution
-- Position-change detection, wallet performance summary, and followed exposure overview
-- Pinned wallets and "new fills since last viewed" indicators
+- Track up to 3 wallets
 
 ## Local Development
 
@@ -66,10 +61,6 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
    - `VAPID_PRIVATE_KEY`
    - `VAPID_EMAIL` (mailto:your@email.com)
    - `FRONTEND_URL` (your static site URL)
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-
-   Redis is recommended for production persistence. Without Redis, the backend falls back to file storage. In production file storage uses `/data/store.json`, which requires a persistent disk to survive restarts.
 
 5. Deploy
 

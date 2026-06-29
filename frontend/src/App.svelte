@@ -3,14 +3,9 @@
   import { fade, fly, slide } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
   import TabBar from './lib/components/TabBar.svelte';
-  import StatusStrip from './lib/components/StatusStrip.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
-  import TradeFilters from './lib/components/TradeFilters.svelte';
-  import PerformanceSummary from './lib/components/PerformanceSummary.svelte';
-  import ExposureOverview from './lib/components/ExposureOverview.svelte';
-  import PositionChanges from './lib/components/PositionChanges.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
   import AccountBalance from './lib/components/AccountBalance.svelte';
@@ -22,14 +17,7 @@
     removeWallet,
     hasWallets
   } from './lib/stores/wallets';
-  import {
-    positions,
-    positionsLoading,
-    positionsError,
-    loadPositions,
-    accountSummary,
-    positionChanges
-  } from './lib/stores/positions';
+  import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
   import {
     trades,
     tradesLoading,
@@ -39,16 +27,10 @@
     loadMoreTrades,
     resetTradesState,
     tradesHasMore,
-    tradesIncomplete,
-    tradesError,
-    newTradesCount,
-    markCurrentTradesSeen
+    tradesIncomplete
   } from './lib/stores/trades';
   import { connectStream, disconnectStream } from './lib/stores/liveStream';
   import { toast } from './lib/stores/toast';
-  import { loadStatus } from './lib/stores/status';
-  import { fillFilters, watchlistSet } from './lib/stores/preferences';
-  import type { Trade } from './lib/types';
 
   let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
@@ -56,42 +38,13 @@
   let refreshInterval: ReturnType<typeof setInterval>;
   let positionSearch = '';
   let isRefreshing = false;
-  let statusInterval: ReturnType<typeof setInterval>;
-  let loadedWalletAddress: string | null = null;
 
   $: filteredPositions = $positions
     .filter(p => p.coin.toLowerCase().includes(positionSearch.toLowerCase()))
-    .filter(p => $watchlistSet.size === 0 || $watchlistSet.has(p.coin.toUpperCase()))
     .sort((a, b) => (b.size * b.currentPrice) - (a.size * a.currentPrice));
-
-  $: filteredTrades = $trades.filter(matchesTradeFilters);
-
-  function getTradeSide(fill: Trade): 'long' | 'short' | 'unknown' {
-    const dir = fill.direction.toLowerCase();
-    if (dir.includes('long')) return 'long';
-    if (dir.includes('short')) return 'short';
-    return fill.side === 'buy' ? 'long' : 'short';
-  }
-
-  function matchesTradeFilters(fill: Trade): boolean {
-    const filters = $fillFilters;
-    const notional = fill.size * fill.price;
-    const direction = fill.direction.toLowerCase();
-
-    if (notional < filters.minNotional) return false;
-    if ($watchlistSet.size > 0 && !$watchlistSet.has(fill.coin.toUpperCase())) return false;
-    if (filters.mode === 'opens' && !direction.includes('open')) return false;
-    if (filters.mode === 'closes' && !direction.includes('close')) return false;
-    if (filters.mode === 'profitable' && (fill.closedPnl ?? 0) <= 0) return false;
-    if (filters.side !== 'all' && getTradeSide(fill) !== filters.side) return false;
-
-    return true;
-  }
 
   onMount(() => {
     loadWallets();
-    loadStatus();
-    statusInterval = setInterval(loadStatus, 30000);
 
     // Positions still poll (mark prices change continuously); fills come via SSE.
     refreshInterval = setInterval(() => {
@@ -114,14 +67,12 @@
 
     return () => {
       clearInterval(refreshInterval);
-      clearInterval(statusInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       disconnectStream();
     };
   });
 
-  $: if ($selectedWallet && $selectedWallet.address !== loadedWalletAddress) {
-    loadedWalletAddress = $selectedWallet.address;
+  $: if ($selectedWallet) {
     resetTradesState();
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
@@ -145,11 +96,6 @@
       removeWallet(address);
       toast.success(`Removed ${name}`);
     }
-  }  
-
-  function handleMarkSeen() {
-    markCurrentTradesSeen();
-    toast.success('Fills marked as seen');
   }
 </script>
 
@@ -246,13 +192,9 @@
   {:else}
     <TabBar bind:activeTab />
     <AccountBalance account={$accountSummary} />
-    <StatusStrip />
 
     <div class="content">
       {#if activeTab === 'positions'}
-        <ExposureOverview wallets={$wallets} />
-        <PositionChanges changes={$positionChanges} />
-
         {#if $positions.length > 0 || positionSearch}
           <div class="search-bar">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -265,7 +207,7 @@
               bind:value={positionSearch}
             />
             {#if positionSearch}
-              <button class="search-clear" on:click={() => positionSearch = ''} aria-label="Clear search">
+              <button class="search-clear" on:click={() => positionSearch = ''}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
@@ -277,11 +219,6 @@
 
         {#if $positionsLoading && $positions.length === 0}
           <PositionCardSkeleton count={3} />
-        {:else if $positionsError && $positions.length === 0}
-          <div class="empty-positions error-state">
-            <p>Could not load positions</p>
-            <button class="retry-btn" on:click={() => $selectedWallet && loadPositions($selectedWallet.address)}>Retry</button>
-          </div>
         {:else if $positions.length === 0}
           <div class="empty-positions">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -310,23 +247,13 @@
           </div>
         {/if}
       {:else}
-        <TradeFilters />
-        <PerformanceSummary trades={$trades} />
-        {#if $newTradesCount > 0}
-          <div class="new-fills">
-            <span>{$newTradesCount} new fill{$newTradesCount === 1 ? '' : 's'} since last viewed</span>
-            <button on:click={handleMarkSeen}>Mark seen</button>
-          </div>
-        {/if}
         <FillsList
-          fills={filteredTrades}
+          fills={$trades}
           loading={$tradesLoading}
           backfilling={$tradesBackfilling}
           loadingMore={$tradesLoadingMore}
           hasMore={$tradesHasMore}
           incomplete={$tradesIncomplete}
-          error={$tradesError}
-          unfilteredCount={$trades.length}
           onLoadMore={loadMoreTrades}
         />
       {/if}
@@ -453,44 +380,6 @@
   .empty-positions p {
     margin: 0;
     font-size: 0.9375rem;
-  }
-
-  .error-state {
-    gap: 0.75rem;
-  }
-
-  .retry-btn {
-    background: var(--accent-dim);
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: var(--radius-sm);
-    padding: 0.5rem 1rem;
-    font-weight: 600;
-  }
-
-  .new-fills {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    background: var(--accent-dim);
-    border: 1px solid rgba(59, 130, 246, 0.35);
-    border-radius: var(--radius-md);
-    padding: 0.625rem 0.75rem;
-    margin-bottom: 0.875rem;
-    color: var(--accent);
-    font-size: 0.8125rem;
-    font-weight: 600;
-  }
-
-  .new-fills button {
-    flex-shrink: 0;
-    color: var(--text-primary);
-    background: var(--accent);
-    border-radius: var(--radius-sm);
-    padding: 0.375rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 700;
   }
 
   .empty-state {
