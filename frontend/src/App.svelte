@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { fade, slide } from 'svelte/transition';
+  import { fade, fly } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
@@ -127,6 +127,52 @@
   function handleSelectWallet(wallet: Wallet) {
     $selectedWallet = wallet;
   }
+
+  // ── Pull-to-refresh ──────────────────────────────────────────────────────────
+  let isPulling = false;
+  let pullDistance = 0;
+  const PULL_THRESHOLD = 64;
+
+  function pullToRefresh(node: HTMLElement) {
+    let startY = 0;
+
+    function onTouchStart(e: TouchEvent) {
+      if (node.scrollTop === 0) startY = e.touches[0].clientY;
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (!startY) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy > 0 && node.scrollTop === 0) {
+        e.preventDefault();
+        isPulling = true;
+        pullDistance = Math.min(dy * 0.52, PULL_THRESHOLD * 1.25);
+      } else if (dy < 0 || node.scrollTop > 0) {
+        startY = 0;
+        isPulling = false;
+        pullDistance = 0;
+      }
+    }
+
+    function onTouchEnd() {
+      if (isPulling && pullDistance >= PULL_THRESHOLD) handleRefresh();
+      isPulling = false;
+      pullDistance = 0;
+      startY = 0;
+    }
+
+    node.addEventListener('touchstart', onTouchStart, { passive: true });
+    node.addEventListener('touchmove', onTouchMove, { passive: false });
+    node.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    return {
+      destroy() {
+        node.removeEventListener('touchstart', onTouchStart);
+        node.removeEventListener('touchmove', onTouchMove);
+        node.removeEventListener('touchend', onTouchEnd);
+      }
+    };
+  }
 </script>
 
 <div class="app" class:compact={$compactMode}>
@@ -137,69 +183,7 @@
     onOpenSettings={() => showSettings = true}
   />
 
-  {#if showSettings}
-    <div class="settings-panel" transition:slide={{ duration: 200 }}>
-      <div class="settings-header">
-        <h2>Settings</h2>
-        <button class="close" on:click={() => showSettings = false} aria-label="Close settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
-
-      <NotificationSettings />
-
-      <div class="wallet-section">
-        <div class="section-header">
-          <h3>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17 21 17 13 7 13 7 21"/>
-              <polyline points="7 3 7 8 15 8"/>
-            </svg>
-            Tracked Wallets
-          </h3>
-          <button class="add-btn" on:click={() => showAddWallet = true}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add
-          </button>
-        </div>
-
-        {#if $wallets.length === 0}
-          <div class="no-wallets">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-            </svg>
-            <p>No wallets tracked yet</p>
-          </div>
-        {:else}
-          <ul class="wallet-list">
-            {#each $wallets as wallet, i (wallet.address)}
-              <li style="animation-delay: {i * 30}ms">
-                <div class="wallet-info">
-                  <span class="wallet-avatar">{wallet.name.charAt(0).toUpperCase()}</span>
-                  <span class="wallet-name">{wallet.name}</span>
-                </div>
-                <button class="remove-btn" on:click={() => handleRemoveWallet(wallet.address, wallet.name)} aria-label="Remove wallet">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  </svg>
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-    </div>
-
-  {:else if !$hasWallets}
+  {#if !$hasWallets}
     <div class="empty-state" in:fade={{ duration: 200 }}>
       <div class="empty-illustration">
         <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
@@ -222,7 +206,32 @@
   {:else}
     <AccountBalance account={$accountSummary} />
 
-    <div class="content">
+    {#if isPulling || isRefreshing}
+      <div
+        class="ptr-indicator"
+        class:ready={pullDistance >= PULL_THRESHOLD}
+        class:refreshing={isRefreshing}
+        style:height="{isRefreshing ? '48px' : Math.max(0, pullDistance) + 'px'}"
+      >
+        <div class="ptr-icon">
+          {#if isRefreshing}
+            <div class="ptr-spinner"></div>
+          {:else}
+            <svg
+              class="ptr-arrow"
+              class:ready={pullDistance >= PULL_THRESHOLD}
+              width="15" height="15" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round"
+            >
+              <path d="M12 5v14M5 12l7 7 7-7"/>
+            </svg>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <div class="content" use:pullToRefresh>
       <WalletComparison
         wallets={$wallets}
         selectedAddress={$selectedWallet?.address ?? null}
@@ -335,6 +344,80 @@
     </div>
   {/if}
 </div>
+
+{#if showSettings}
+  <div
+    class="settings-overlay"
+    on:click={() => showSettings = false}
+    transition:fade={{ duration: 220 }}
+    aria-hidden="true"
+  ></div>
+  <aside
+    class="settings-drawer"
+    in:fly={{ x: 420, duration: 280 }}
+    out:fly={{ x: 420, duration: 220 }}
+    aria-label="Settings"
+  >
+    <div class="settings-header">
+      <h2>Settings</h2>
+      <button class="close" on:click={() => showSettings = false} aria-label="Close settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <NotificationSettings />
+
+    <div class="wallet-section">
+      <div class="section-header">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Tracked Wallets
+        </h3>
+        <button class="add-btn" on:click={() => { showSettings = false; showAddWallet = true; }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/>
+            <line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add
+        </button>
+      </div>
+
+      {#if $wallets.length === 0}
+        <div class="no-wallets">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+          </svg>
+          <p>No wallets tracked yet</p>
+        </div>
+      {:else}
+        <ul class="wallet-list">
+          {#each $wallets as wallet, i (wallet.address)}
+            <li style="animation-delay: {i * 30}ms">
+              <div class="wallet-info">
+                <span class="wallet-avatar">{wallet.name.charAt(0).toUpperCase()}</span>
+                <span class="wallet-name">{wallet.name}</span>
+              </div>
+              <button class="remove-btn" on:click={() => handleRemoveWallet(wallet.address, wallet.name)} aria-label="Remove wallet">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  </aside>
+{/if}
 
 {#if showAddWallet}
   <AddWallet onClose={() => showAddWallet = false} />
@@ -577,12 +660,85 @@
     transform: scale(0.98);
   }
 
-  .settings-panel {
-    flex: 1;
-    padding: 1rem;
-    padding-bottom: calc(1rem + var(--safe-bottom, 0px));
+  /* ── Pull-to-refresh ── */
+  .ptr-indicator {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+    overflow: hidden;
+    transition: height 0.2s ease-out;
+    flex-shrink: 0;
+  }
+
+  .ptr-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    color: var(--text-tertiary);
+    transition: border-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .ptr-indicator.ready .ptr-icon {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .ptr-arrow {
+    transition: transform 0.22s ease-out;
+  }
+
+  .ptr-arrow.ready {
+    transform: rotate(180deg);
+  }
+
+  .ptr-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: ptrSpin 0.7s linear infinite;
+  }
+
+  @keyframes ptrSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Settings overlay + drawer ── */
+  .settings-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 200;
+  }
+
+  .settings-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    height: 100dvh;
+    width: min(380px, 100vw);
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    box-shadow: -12px 0 48px rgba(0, 0, 0, 0.7);
+    z-index: 201;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 1.5rem 1.25rem;
+    padding-top: calc(1.5rem + var(--safe-top, 0px));
+    padding-bottom: calc(1.5rem + var(--safe-bottom, 0px));
+    display: flex;
+    flex-direction: column;
   }
 
   .settings-header {

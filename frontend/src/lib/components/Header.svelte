@@ -31,7 +31,7 @@
     justify-content: space-between;
     padding: 0.75rem 1rem;
     padding-top: calc(0.75rem + var(--safe-top, 0px));
-    background: var(--bg-card);
+    background: linear-gradient(180deg, #1c1c22 0%, var(--bg-card) 100%);
     border-bottom: 1px solid var(--border);
     position: relative;
     z-index: 50;
@@ -40,12 +40,13 @@
   header::after {
     content: '';
     position: absolute;
-    bottom: -8px;
+    bottom: -14px;
     left: 0;
     right: 0;
-    height: 8px;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), transparent);
+    height: 14px;
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.25), transparent);
     pointer-events: none;
+    z-index: 1;
   }
 
   .logo-container {
