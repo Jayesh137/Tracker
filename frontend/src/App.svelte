@@ -3,9 +3,11 @@
   import { fade, fly, slide } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
   import TabBar from './lib/components/TabBar.svelte';
+  import StatusStrip from './lib/components/StatusStrip.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
+  import PositionChanges from './lib/components/PositionChanges.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
   import AccountBalance from './lib/components/AccountBalance.svelte';
@@ -17,7 +19,14 @@
     removeWallet,
     hasWallets
   } from './lib/stores/wallets';
-  import { positions, positionsLoading, loadPositions, accountSummary } from './lib/stores/positions';
+  import {
+    positions,
+    positionsLoading,
+    positionsError,
+    loadPositions,
+    accountSummary,
+    positionChanges
+  } from './lib/stores/positions';
   import {
     trades,
     tradesLoading,
@@ -27,17 +36,23 @@
     loadMoreTrades,
     resetTradesState,
     tradesHasMore,
-    tradesIncomplete
+    tradesIncomplete,
+    tradesError,
+    newTradesCount,
+    markCurrentTradesSeen
   } from './lib/stores/trades';
   import { connectStream, disconnectStream } from './lib/stores/liveStream';
   import { toast } from './lib/stores/toast';
+  import { loadHealth } from './lib/stores/status';
 
   let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
   let showSettings = false;
   let refreshInterval: ReturnType<typeof setInterval>;
+  let healthInterval: ReturnType<typeof setInterval>;
   let positionSearch = '';
   let isRefreshing = false;
+  let loadedWalletAddress: string | null = null;
 
   $: filteredPositions = $positions
     .filter(p => p.coin.toLowerCase().includes(positionSearch.toLowerCase()))
@@ -45,6 +60,8 @@
 
   onMount(() => {
     loadWallets();
+    loadHealth();
+    healthInterval = setInterval(loadHealth, 30000);
 
     // Positions still poll (mark prices change continuously); fills come via SSE.
     refreshInterval = setInterval(() => {
@@ -67,12 +84,14 @@
 
     return () => {
       clearInterval(refreshInterval);
+      clearInterval(healthInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       disconnectStream();
     };
   });
 
-  $: if ($selectedWallet) {
+  $: if ($selectedWallet && $selectedWallet.address !== loadedWalletAddress) {
+    loadedWalletAddress = $selectedWallet.address;
     resetTradesState();
     loadPositions($selectedWallet.address);
     loadTrades($selectedWallet.address);
@@ -96,6 +115,11 @@
       removeWallet(address);
       toast.success(`Removed ${name}`);
     }
+  }
+
+  function handleMarkSeen() {
+    markCurrentTradesSeen();
+    toast.success('Fills marked as seen');
   }
 </script>
 
@@ -192,9 +216,12 @@
   {:else}
     <TabBar bind:activeTab />
     <AccountBalance account={$accountSummary} />
+    <StatusStrip />
 
     <div class="content">
       {#if activeTab === 'positions'}
+        <PositionChanges changes={$positionChanges} />
+
         {#if $positions.length > 0 || positionSearch}
           <div class="search-bar">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -207,7 +234,7 @@
               bind:value={positionSearch}
             />
             {#if positionSearch}
-              <button class="search-clear" on:click={() => positionSearch = ''}>
+              <button class="search-clear" on:click={() => positionSearch = ''} aria-label="Clear search">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"/>
                   <line x1="6" y1="6" x2="18" y2="18"/>
@@ -219,6 +246,11 @@
 
         {#if $positionsLoading && $positions.length === 0}
           <PositionCardSkeleton count={3} />
+        {:else if $positionsError && $positions.length === 0}
+          <div class="empty-positions error-state">
+            <p>Could not load positions</p>
+            <button class="retry-btn" on:click={() => $selectedWallet && loadPositions($selectedWallet.address)}>Retry</button>
+          </div>
         {:else if $positions.length === 0}
           <div class="empty-positions">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -247,6 +279,12 @@
           </div>
         {/if}
       {:else}
+        {#if $newTradesCount > 0}
+          <div class="new-fills">
+            <span>{$newTradesCount} new fill{$newTradesCount === 1 ? '' : 's'} since last viewed</span>
+            <button on:click={handleMarkSeen}>Mark seen</button>
+          </div>
+        {/if}
         <FillsList
           fills={$trades}
           loading={$tradesLoading}
@@ -254,6 +292,7 @@
           loadingMore={$tradesLoadingMore}
           hasMore={$tradesHasMore}
           incomplete={$tradesIncomplete}
+          error={$tradesError}
           onLoadMore={loadMoreTrades}
         />
       {/if}
@@ -380,6 +419,44 @@
   .empty-positions p {
     margin: 0;
     font-size: 0.9375rem;
+  }
+
+  .error-state {
+    gap: 0.75rem;
+  }
+
+  .retry-btn {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+    font-weight: 600;
+  }
+
+  .new-fills {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: var(--bg-card);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    border-radius: var(--radius-md);
+    padding: 0.625rem 0.75rem;
+    margin-bottom: 0.875rem;
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+
+  .new-fills button {
+    flex-shrink: 0;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-radius: var(--radius-sm);
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 700;
   }
 
   .empty-state {

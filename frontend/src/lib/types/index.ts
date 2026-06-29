@@ -52,3 +52,17 @@ export interface Wallet {
   address: string;
   name: string;
 }
+
+export interface HealthResponse {
+  status: string;
+  wallets: number;
+  websocket: string;
+  websocketDetail?: {
+    connected: boolean;
+    subscriptions: string[];
+    reconnectAttempts: number;
+    connecting: boolean;
+  };
+  sseClients?: number;
+  uptime: number;
+}

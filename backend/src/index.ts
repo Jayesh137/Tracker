@@ -20,6 +20,12 @@ const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
+function getStorePath(): string {
+  if (process.env.STORE_PATH) return process.env.STORE_PATH;
+  if (process.env.NODE_ENV === 'production') return '/data/store.json';
+  return './data/store.json';
+}
+
 async function main() {
   // Initialize storage - use Redis if configured, otherwise file storage
   let storage: IStorage;
@@ -28,8 +34,12 @@ async function main() {
     console.log('[Storage] Using Redis storage');
     storage = new RedisStorage();
   } else {
-    console.log('[Storage] Using file storage (data may not persist on Render)');
-    storage = new Storage('./data/store.json');
+    const storePath = getStorePath();
+    console.log(`[Storage] Using file storage at ${storePath}`);
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[Storage] Production file storage requires a persistent disk at /data or STORE_PATH');
+    }
+    storage = new Storage(storePath);
   }
 
   await storage.load();

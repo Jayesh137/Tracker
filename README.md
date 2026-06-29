@@ -61,6 +61,10 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
    - `VAPID_PRIVATE_KEY`
    - `VAPID_EMAIL` (mailto:your@email.com)
    - `FRONTEND_URL` (your static site URL)
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+
+   Redis is recommended for production persistence. Without Redis, the backend falls back to file storage. In production file storage uses `/data/store.json`, which requires a persistent disk to survive restarts.
 
 5. Deploy
 

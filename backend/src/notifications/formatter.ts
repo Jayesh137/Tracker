@@ -7,43 +7,58 @@ export function shortenAddress(address: string): string {
 export function formatPrice(price: number): string {
   if (price >= 1000) {
     return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  } else if (price >= 1) {
-    return price.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  } else {
-    return price.toLocaleString('en-US', { maximumFractionDigits: 4 });
   }
+  if (price >= 1) {
+    return price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+  return price.toLocaleString('en-US', { maximumFractionDigits: 4 });
 }
 
 export function formatSize(size: number, coin: string): string {
-  if (coin === 'BTC') {
-    return size.toFixed(4);
-  } else if (coin === 'ETH') {
-    return size.toFixed(3);
-  } else {
-    return size.toFixed(2);
-  }
+  if (coin === 'BTC') return size.toFixed(4);
+  if (coin === 'ETH') return size.toFixed(3);
+  return size.toFixed(2);
+}
+
+export function parseFillDirection(fill: HyperliquidFill): {
+  action: 'opened' | 'closed' | 'reduced' | 'increased' | 'traded';
+  positionSide: 'LONG' | 'SHORT' | null;
+} {
+  const dir = (fill.dir || '').toLowerCase();
+  const positionSide = dir.includes('long')
+    ? 'LONG'
+    : dir.includes('short')
+      ? 'SHORT'
+      : null;
+
+  let action: 'opened' | 'closed' | 'reduced' | 'increased' | 'traded' = 'traded';
+  if (dir.includes('open')) action = 'opened';
+  else if (dir.includes('close')) action = 'closed';
+  else if (dir.includes('reduce')) action = 'reduced';
+  else if (dir.includes('increase')) action = 'increased';
+
+  return { action, positionSide };
 }
 
 export function formatTradeNotification(fill: HyperliquidFill, wallet: string): { title: string; body: string } {
-  const side = fill.side === 'B' ? 'LONG' : 'SHORT';
-  const emoji = fill.side === 'B' ? '🟢' : '🔴';
-  const action = fill.dir === 'Open' ? 'opened' : fill.dir === 'Close' ? 'closed' : 'traded';
+  const { action, positionSide } = parseFillDirection(fill);
+  const sideLabel = positionSide ?? (fill.side === 'B' ? 'BUY' : 'SELL');
+  const emoji = sideLabel === 'LONG' ? '🟢' : sideLabel === 'SHORT' ? '🔴' : '⚪';
 
   const size = parseFloat(fill.sz);
   const price = parseFloat(fill.px);
   const closedPnl = parseFloat(fill.closedPnl || '0');
-
   const shortAddr = shortenAddress(wallet);
 
   let body = `${formatSize(size, fill.coin)} ${fill.coin} @ $${formatPrice(price)}`;
 
-  if (fill.dir === 'Close' && closedPnl !== 0) {
-    const pnlSign = closedPnl >= 0 ? '+' : '';
-    body += ` | ${pnlSign}$${closedPnl.toFixed(2)} PnL`;
+  if (action === 'closed' && closedPnl !== 0) {
+    const pnlSign = closedPnl >= 0 ? '+' : '-';
+    body += ` | ${pnlSign}$${Math.abs(closedPnl).toFixed(2)} PnL`;
   }
 
   return {
-    title: `${emoji} ${shortAddr} ${action} ${side}`,
+    title: `${emoji} ${shortAddr} ${action} ${sideLabel}`,
     body
   };
 }

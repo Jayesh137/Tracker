@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
-import { addSSEClient, removeSSEClient } from './sse.js';
+import { addSSEClient, getSSEClientCount, removeSSEClient } from './sse.js';
 import type { PushSubscription, IStorage } from './types/index.js';
 
 export function createRoutes(
@@ -15,10 +15,13 @@ export function createRoutes(
 
   // Health check
   router.get('/health', (req: Request, res: Response) => {
+    const websocket = hlWebSocket.getStatus();
     res.json({
       status: 'ok',
       wallets: storage.getWallets().length,
-      websocket: hlWebSocket.isConnected() ? 'connected' : 'disconnected',
+      websocket: websocket.connected ? 'connected' : 'disconnected',
+      websocketDetail: websocket,
+      sseClients: getSSEClientCount(),
       uptime: process.uptime()
     });
   });

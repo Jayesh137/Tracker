@@ -167,4 +167,13 @@ export class HyperliquidWebSocket {
   isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
+
+  getStatus() {
+    return {
+      connected: this.isConnected(),
+      subscriptions: Array.from(this.subscriptions.keys()),
+      reconnectAttempts: this.reconnectAttempts,
+      connecting: this.isConnecting
+    };
+  }
 }

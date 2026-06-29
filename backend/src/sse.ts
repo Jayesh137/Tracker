@@ -47,5 +47,9 @@ export function broadcastHeartbeat(): void {
   }
 }
 
+export function getSSEClientCount(): number {
+  return clients.size;
+}
+
 // Keep connections alive (Render proxies idle connections after ~60s)
 setInterval(broadcastHeartbeat, 25_000);

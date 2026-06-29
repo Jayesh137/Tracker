@@ -8,6 +8,7 @@
   export let loadingMore: boolean = false;
   export let hasMore: boolean = false;
   export let incomplete: boolean = false;
+  export let error: string | null = null;
   export let onLoadMore: (() => void) | null = null;
 
   interface CoinGroup {
@@ -97,8 +98,13 @@
     </div>
   {/if}
 
-  {#if fills.length === 0 && !loading}
-    <p class="empty">No fills</p>
+  {#if error && fills.length === 0 && !loading}
+    <div class="empty error">
+      <p>Could not load fills</p>
+      <span>{error}</span>
+    </div>
+  {:else if fills.length === 0 && !loading}
+    <p class="empty">No fills found for this wallet</p>
   {:else}
     {#each daySections as section (section.dateKey)}
       <div class="day-section">
@@ -178,6 +184,23 @@
     padding: 3rem 1rem;
     margin: 0;
     font-size: 0.875rem;
+  }
+
+  .empty.error {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .empty.error p {
+    margin: 0;
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .empty.error span {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
   }
 
   .load-more { padding: 1rem 0 0.5rem; display: flex; justify-content: center; }
