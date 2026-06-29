@@ -9,6 +9,7 @@
   $: liqDistance = position.liquidationPrice
     ? Math.abs((position.currentPrice - position.liquidationPrice) / position.currentPrice) * 100
     : null;
+  $: liqDanger = liqDistance !== null && liqDistance < 10;
 
   function formatNumber(num: number, decimals: number = 2): string {
     return num.toLocaleString('en-US', {
@@ -44,12 +45,12 @@
           {position.side.toUpperCase()} {position.leverage}x
         </span>
       </div>
-      <span class="subline">{formatNumber(position.size, 4)} {position.coin} at {formatPrice(position.entryPrice)}</span>
+      <span class="subline">{formatNumber(position.size, 4)} @ {formatPrice(position.entryPrice)}</span>
     </div>
 
-    <div class="notional">
-      <span>{formatCompact(sizeUsd)}</span>
-      <small>Notional</small>
+    <div class="pnl-hero" class:profit={isProfit} class:loss={!isProfit}>
+      <strong>{formatPnl(position.unrealizedPnl)}</strong>
+      <span>{isProfit ? '+' : ''}{Math.round(position.unrealizedPnlPercent)}%</span>
     </div>
   </div>
 
@@ -64,25 +65,26 @@
     </div>
     <div>
       <span>Liquidation</span>
-      <strong>{position.liquidationPrice ? formatPrice(position.liquidationPrice) : 'None'}</strong>
+      <strong class:danger={liqDanger}>{position.liquidationPrice ? formatPrice(position.liquidationPrice) : 'None'}</strong>
     </div>
   </div>
 
   <div class="bottom-row">
-    <div class="pnl" class:profit={isProfit} class:loss={!isProfit}>
-      <strong>{formatPnl(position.unrealizedPnl)}</strong>
-      <span>{isProfit ? '+' : ''}{Math.round(position.unrealizedPnlPercent)}%</span>
+    <div class="notional">
+      <span>{formatCompact(sizeUsd)}</span>
+      <small>Notional</small>
     </div>
     <div class="risk">
       <span>Margin {formatPrice(position.marginUsed)}</span>
-      <span>{liqDistance === null ? 'No liquidation price' : `${liqDistance.toFixed(1)}% to liq`}</span>
+      <span class:danger={liqDanger}>
+        {liqDistance === null ? 'No liq price' : `${liqDistance.toFixed(1)}% to liq`}
+      </span>
     </div>
   </div>
 </article>
 
 <style>
   .position-card {
-    background: var(--bg-card);
     border-radius: var(--radius-md);
     padding: 0.875rem 1rem;
     border: 1px solid var(--border);
@@ -91,30 +93,31 @@
   }
 
   .position-card.long {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.05) 0%, var(--bg-card) 55%);
     border-left-color: var(--green);
   }
 
   .position-card.short {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, var(--bg-card) 55%);
     border-left-color: var(--red);
   }
 
   .position-card:hover {
-    background: var(--bg-card-hover);
+    filter: brightness(1.04);
   }
 
   .main-row,
-  .bottom-row,
-  .price-row {
+  .bottom-row {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
+    align-items: flex-start;
   }
 
   .asset,
   .notional,
-  .pnl,
-  .risk,
-  .price-row div {
+  .pnl-hero,
+  .risk {
     min-width: 0;
   }
 
@@ -139,6 +142,7 @@
     font-size: 0.6875rem;
     font-weight: 750;
     letter-spacing: 0.02em;
+    flex-shrink: 0;
   }
 
   .side-badge.long {
@@ -151,35 +155,49 @@
     color: var(--red);
   }
 
-  .subline,
-  .notional small,
-  .price-row span,
-  .risk span {
-    color: var(--text-tertiary);
-    font-size: 0.75rem;
-  }
-
   .subline {
     display: block;
     margin-top: 0.25rem;
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
   }
 
-  .notional {
-    text-align: right;
+  /* ── P&L hero (top-right) ── */
+  .pnl-hero {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    align-items: flex-end;
+    gap: 0.1rem;
+    flex-shrink: 0;
   }
 
-  .notional span {
-    color: var(--text-primary);
-    font-size: 1.25rem;
+  .pnl-hero strong {
+    font-size: 1.375rem;
     font-weight: 800;
     line-height: 1;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 
+  .pnl-hero span {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.9;
+  }
+
+  .pnl-hero.profit strong,
+  .pnl-hero.profit span {
+    color: var(--green);
+  }
+
+  .pnl-hero.loss strong,
+  .pnl-hero.loss span {
+    color: var(--red);
+  }
+
+  /* ── Price row ── */
   .price-row {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -187,12 +205,22 @@
     padding: 0.75rem 0;
     border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
+    gap: 0;
   }
 
   .price-row div {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .price-row span {
+    color: var(--text-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .price-row strong {
@@ -204,32 +232,30 @@
     text-overflow: ellipsis;
   }
 
-  .pnl {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
-  .pnl strong {
-    font-size: 1.25rem;
-    font-weight: 800;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .pnl span {
-    font-size: 0.8125rem;
-    font-weight: 750;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .pnl.profit {
-    color: var(--green);
-  }
-
-  .pnl.loss {
+  .price-row strong.danger {
     color: var(--red);
+  }
+
+  /* ── Bottom row ── */
+  .notional {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+
+  .notional span {
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .notional small {
+    color: var(--text-tertiary);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .risk {
@@ -238,6 +264,16 @@
     align-items: flex-end;
     gap: 0.125rem;
     text-align: right;
+  }
+
+  .risk span {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+  }
+
+  .risk span.danger {
+    color: var(--red);
+    font-weight: 600;
   }
 
   :global(.compact) .position-card {
@@ -253,10 +289,10 @@
     .main-row,
     .bottom-row {
       flex-direction: column;
-      gap: 0.625rem;
+      gap: 0.5rem;
     }
 
-    .notional,
+    .pnl-hero,
     .risk {
       align-items: flex-start;
       text-align: left;
