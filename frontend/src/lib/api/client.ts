@@ -1,4 +1,4 @@
-import type { PositionsResponse, Trade, Wallet, TradesResponse } from '../types';
+import type { AppStatus, PositionsResponse, Wallet, TradesResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -72,5 +72,8 @@ export const api = {
 
   // Health
   getHealth: () =>
-    fetchJson<{ status: string; wallets: number; websocket: string; uptime: number }>('/health')
+    fetchJson<{ status: string; wallets: number; websocket: string; uptime: number }>('/health'),
+
+  getStatus: () =>
+    fetchJson<AppStatus>('/status')
 };

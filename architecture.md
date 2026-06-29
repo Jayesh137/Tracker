@@ -2,6 +2,8 @@
 
 ## System Overview
 
+> Current implementation note: the frontend is Svelte 5/Vite, the backend can use Upstash Redis for production persistence, and the app now includes SSE live fill updates, wallet health status, local filters/watchlists, pinned wallets, position-change detection, performance summaries, and multi-wallet exposure overview.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                            INTERNET                                  │

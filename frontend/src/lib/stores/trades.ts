@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store';
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import { api } from '../api/client';
 import { soundEnabled, playAlertSound } from '../utils/sound';
+import { getLastSeenFill, markWalletFillsSeen } from './preferences';
 import type { Trade } from '../types';
 
 const CACHE_KEY = (address: string) => `hl-trades-${address.toLowerCase()}`;
@@ -26,6 +27,7 @@ export const tradesLoadingMore = writable(false);
 export const tradesHasMore = writable(false);
 export const tradesIncomplete = writable(false);
 export const tradesError = writable<string | null>(null);
+export const newTradesCount = writable(0);
 
 let lastKnownTradeId: string | null = null;
 let isFirstLoad = true;
@@ -75,6 +77,11 @@ function mergeAndSet(newTrades: Trade[]): { added: number } {
   return { added };
 }
 
+function updateNewTradeCount(address: string): void {
+  const lastSeen = getLastSeenFill(address);
+  newTradesCount.set(get(trades).filter(t => t.timestamp > lastSeen).length);
+}
+
 export async function loadTrades(address: string) {
   if (isFirstLoad) tradesLoading.set(true);
   tradesError.set(null);
@@ -89,6 +96,7 @@ export async function loadTrades(address: string) {
       trades.set(cached.trades);
       oldestFetched = cached.oldestFetched;
       lastKnownTradeId = cached.trades[0].id;
+      updateNewTradeCount(address);
       tradesLoading.set(false);
     }
   }
@@ -105,6 +113,7 @@ export async function loadTrades(address: string) {
     }
 
     const { added } = mergeAndSet(result.trades);
+    updateNewTradeCount(address);
     if (result.trades.length > 0) {
       lastKnownTradeId = get(trades)[0]?.id ?? null;
     }
@@ -261,8 +270,17 @@ export function ingestLiveTrade(trade: Trade): void {
   if (added > 0) {
     if (get(soundEnabled)) playAlertSound();
     if (currentAddress) void writeCache(currentAddress);
+    if (currentAddress) updateNewTradeCount(currentAddress);
     lastKnownTradeId = get(trades)[0]?.id ?? null;
   }
+}
+
+export function markCurrentTradesSeen(): void {
+  if (!currentAddress) return;
+  const newest = get(trades)[0]?.timestamp;
+  if (!newest) return;
+  markWalletFillsSeen(currentAddress, newest);
+  newTradesCount.set(0);
 }
 
 export function resetTradesState() {
@@ -277,4 +295,5 @@ export function resetTradesState() {
   tradesError.set(null);
   tradesBackfilling.set(false);
   tradesLoadingMore.set(false);
+  newTradesCount.set(0);
 }

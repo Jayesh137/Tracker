@@ -7,13 +7,13 @@
 
   function handleCopy(e: MouseEvent) {
     e.stopPropagation();
-    const value = (fill.size * fill.price).toFixed(2);
     const time = new Date(fill.timestamp).toLocaleString();
+    const action = fill.direction || (fill.side === 'buy' ? 'Buy' : 'Sell');
     const lines = [
-      `${fill.coin} ${fill.direction || fill.side.toUpperCase()}`,
+      `${action} ${fill.coin}`,
+      `Notional: ${formatFillValue(fill.size, fill.price)}`,
       `Size: ${fill.size}`,
-      `Price: $${fill.price}`,
-      `Value: $${value}`,
+      `Price: ${formatPrice(fill.price)}`,
       fill.closedPnl != null && fill.closedPnl !== 0
         ? `PnL: ${fill.closedPnl > 0 ? '+' : ''}$${fill.closedPnl.toFixed(2)}`
         : '',
@@ -23,8 +23,8 @@
   }
 
   // Determine position type from direction (Open Long, Close Short, etc.)
-  $: isLongPosition = fill.direction?.includes('Long') ?? fill.side === 'buy';
-  $: isShortPosition = fill.direction?.includes('Short') ?? fill.side === 'sell';
+  $: isLongPosition = fill.direction?.includes('Long') || (!fill.direction && fill.side === 'buy');
+  $: isShortPosition = fill.direction?.includes('Short') || (!fill.direction && fill.side === 'sell');
   $: isOpen = fill.direction?.includes('Open') ?? false;
   $: isClose = fill.direction?.includes('Close') ?? false;
   $: isProfit = (fill.closedPnl ?? 0) > 0;
@@ -59,9 +59,24 @@
     if (value >= 1000) return '$' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
     return '$' + value.toFixed(2);
   }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      expanded = !expanded;
+    }
+  }
 </script>
 
-<div class="fill-row" class:expanded on:click={() => expanded = !expanded}>
+<div
+  class="fill-row"
+  class:expanded
+  on:click={() => expanded = !expanded}
+  on:keydown={handleKeydown}
+  role="button"
+  tabindex="0"
+  aria-expanded={expanded}
+>
   <div class="summary">
     <span class="time">{formatTime(fill.timestamp)}</span>
     <span class="action" class:long={isLongPosition} class:short={isShortPosition}>

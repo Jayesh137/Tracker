@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { wallets, selectedWallet } from '../stores/wallets';
+  import { wallets, selectedWallet, togglePinnedWallet } from '../stores/wallets';
+  import { pinnedWalletSet } from '../stores/preferences';
   import { copyToClipboard } from '../utils/clipboard';
   import type { Wallet } from '../types';
   import { fly } from 'svelte/transition';
@@ -19,6 +20,11 @@
   function copyAddress(e: MouseEvent, addr: string) {
     e.stopPropagation();
     copyToClipboard(addr, 'Address copied');
+  }
+
+  function handlePin(e: MouseEvent, addr: string) {
+    e.stopPropagation();
+    togglePinnedWallet(addr);
   }
 
   function handleClickOutside(event: MouseEvent) {
@@ -74,6 +80,17 @@
               <span class="wallet-name">{wallet.name || shorten(wallet.address)}</span>
               <span class="wallet-addr">{shorten(wallet.address)}</span>
             </span>
+          </button>
+          <button
+            class="pin-btn"
+            class:pinned={$pinnedWalletSet.has(wallet.address.toLowerCase())}
+            on:click={(e) => handlePin(e, wallet.address)}
+            aria-label="Pin wallet"
+            title="Pin wallet"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M14 2l8 8-3 1-5 5v5l-2 2-5-5-5 5-1-1 5-5-5-5 2-2h5l5-5 1-3z"/>
+            </svg>
           </button>
           <button class="copy-btn" on:click={(e) => copyAddress(e, wallet.address)} aria-label="Copy address" title="Copy address">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -211,6 +228,21 @@
     padding: 0 0.75rem;
     cursor: pointer;
     transition: color var(--transition-fast);
+  }
+  .pin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    padding: 0 0.5rem;
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+  .pin-btn.pinned,
+  .pin-btn:hover {
+    color: var(--accent);
   }
   .copy-btn:hover {
     color: var(--accent);

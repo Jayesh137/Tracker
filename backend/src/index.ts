@@ -11,7 +11,7 @@ import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
 import { formatTradeNotification } from './notifications/formatter.js';
 import { createRoutes } from './routes.js';
-import { addSSEClient, removeSSEClient, broadcastFill } from './sse.js';
+import { broadcastFill, getSSEClientCount } from './sse.js';
 import type { HyperliquidFill, IStorage } from './types/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +19,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+function getStorePath(): string {
+  if (process.env.STORE_PATH) return process.env.STORE_PATH;
+  if (process.env.NODE_ENV === 'production') return '/data/store.json';
+  return './data/store.json';
+}
 
 async function main() {
   // Initialize storage - use Redis if configured, otherwise file storage
@@ -28,8 +34,12 @@ async function main() {
     console.log('[Storage] Using Redis storage');
     storage = new RedisStorage();
   } else {
-    console.log('[Storage] Using file storage (data may not persist on Render)');
-    storage = new Storage('./data/store.json');
+    const storePath = getStorePath();
+    console.log(`[Storage] Using file storage at ${storePath}`);
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[Storage] Production file storage requires a persistent disk at /data or STORE_PATH');
+    }
+    storage = new Storage(storePath);
   }
 
   await storage.load();
@@ -105,6 +115,20 @@ async function main() {
     } else {
       res.status(503).json({ error: 'Push notifications not configured' });
     }
+  });
+
+  app.get('/api/status', (req, res) => {
+    const wsStatus = hlWebSocket.getStatus();
+    res.json({
+      status: 'ok',
+      storage: process.env.UPSTASH_REDIS_REST_URL ? 'redis' : 'file',
+      wallets: storage.getWallets().length,
+      websocket: wsStatus,
+      sseClients: getSSEClientCount(),
+      uptime: process.uptime(),
+      pushSubscriptions: storage.getPushSubscriptions().length,
+      pushConfigured: Boolean(vapidPublic && vapidPrivate && vapidEmail)
+    });
   });
 
   // Serve static frontend in production

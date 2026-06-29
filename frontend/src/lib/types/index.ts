@@ -52,3 +52,19 @@ export interface Wallet {
   address: string;
   name: string;
 }
+
+export interface AppStatus {
+  status: string;
+  storage: 'redis' | 'file';
+  wallets: number;
+  websocket: {
+    connected: boolean;
+    subscriptions: string[];
+    reconnectAttempts: number;
+    connecting: boolean;
+  };
+  sseClients: number;
+  uptime: number;
+  pushSubscriptions: number;
+  pushConfigured: boolean;
+}
