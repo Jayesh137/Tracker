@@ -3,7 +3,6 @@
   import { fade, fly, slide } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
   import TabBar from './lib/components/TabBar.svelte';
-  import StatusStrip from './lib/components/StatusStrip.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
@@ -37,19 +36,15 @@
     resetTradesState,
     tradesHasMore,
     tradesIncomplete,
-    tradesError,
-    newTradesCount,
-    markCurrentTradesSeen
+    tradesError
   } from './lib/stores/trades';
   import { connectStream, disconnectStream } from './lib/stores/liveStream';
   import { toast } from './lib/stores/toast';
-  import { loadHealth } from './lib/stores/status';
 
   let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
   let showSettings = false;
   let refreshInterval: ReturnType<typeof setInterval>;
-  let healthInterval: ReturnType<typeof setInterval>;
   let positionSearch = '';
   let isRefreshing = false;
   let loadedWalletAddress: string | null = null;
@@ -60,8 +55,6 @@
 
   onMount(() => {
     loadWallets();
-    loadHealth();
-    healthInterval = setInterval(loadHealth, 30000);
 
     // Positions still poll (mark prices change continuously); fills come via SSE.
     refreshInterval = setInterval(() => {
@@ -84,7 +77,6 @@
 
     return () => {
       clearInterval(refreshInterval);
-      clearInterval(healthInterval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       disconnectStream();
     };
@@ -115,11 +107,6 @@
       removeWallet(address);
       toast.success(`Removed ${name}`);
     }
-  }
-
-  function handleMarkSeen() {
-    markCurrentTradesSeen();
-    toast.success('Fills marked as seen');
   }
 </script>
 
@@ -215,8 +202,9 @@
 
   {:else}
     <TabBar bind:activeTab />
-    <AccountBalance account={$accountSummary} />
-    <StatusStrip />
+    {#if activeTab === 'positions'}
+      <AccountBalance account={$accountSummary} />
+    {/if}
 
     <div class="content">
       {#if activeTab === 'positions'}
@@ -279,12 +267,6 @@
           </div>
         {/if}
       {:else}
-        {#if $newTradesCount > 0}
-          <div class="new-fills">
-            <span>{$newTradesCount} new fill{$newTradesCount === 1 ? '' : 's'} since last viewed</span>
-            <button on:click={handleMarkSeen}>Mark seen</button>
-          </div>
-        {/if}
         <FillsList
           fills={$trades}
           loading={$tradesLoading}
@@ -432,31 +414,6 @@
     border-radius: var(--radius-sm);
     padding: 0.5rem 1rem;
     font-weight: 600;
-  }
-
-  .new-fills {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    background: var(--bg-card);
-    border: 1px solid rgba(59, 130, 246, 0.35);
-    border-radius: var(--radius-md);
-    padding: 0.625rem 0.75rem;
-    margin-bottom: 0.875rem;
-    color: var(--text-primary);
-    font-size: 0.8125rem;
-    font-weight: 600;
-  }
-
-  .new-fills button {
-    flex-shrink: 0;
-    color: var(--accent);
-    background: var(--accent-dim);
-    border-radius: var(--radius-sm);
-    padding: 0.375rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 700;
   }
 
   .empty-state {

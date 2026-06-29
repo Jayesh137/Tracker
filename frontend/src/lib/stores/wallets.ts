@@ -74,19 +74,6 @@ async function saveSelectedWallet(wallet: Wallet | null): Promise<void> {
   } catch (e) {}
 }
 
-async function loadSelectedWalletAddress(): Promise<string | null> {
-  try {
-    const addr = await idbGet<string>(SELECTED_IDB_KEY);
-    if (addr) return addr;
-  } catch (e) {}
-
-  try {
-    return localStorage.getItem(SELECTED_LS_KEY);
-  } catch (e) {
-    return null;
-  }
-}
-
 function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
   const merged = new Map<string, Wallet>();
 
@@ -104,9 +91,25 @@ function mergeWallets(local: Wallet[], remote: Wallet[]): Wallet[] {
   return sortWallets(Array.from(merged.values()));
 }
 
+const DEFAULT_WALLET_ORDER = ['ezekiel', 'loracle'];
+
+function walletPriority(wallet: Wallet): number {
+  const name = (wallet.name || '').trim().toLowerCase();
+  const index = DEFAULT_WALLET_ORDER.indexOf(name);
+  return index === -1 ? DEFAULT_WALLET_ORDER.length : index;
+}
+
+function getDefaultWallet(list: Wallet[]): Wallet | null {
+  return sortWallets(list)[0] ?? null;
+}
+
 export function sortWallets(list: Wallet[]): Wallet[] {
   const pinned = get(pinnedWalletSet);
   return [...list].sort((a, b) => {
+    const aPriority = walletPriority(a);
+    const bPriority = walletPriority(b);
+    if (aPriority !== bPriority) return aPriority - bPriority;
+
     const aPinned = pinned.has(a.address.toLowerCase()) ? 0 : 1;
     const bPinned = pinned.has(b.address.toLowerCase()) ? 0 : 1;
     if (aPinned !== bPinned) return aPinned - bPinned;
@@ -144,11 +147,7 @@ export async function loadWallets() {
   if (localWallets.length > 0) {
     wallets.set(localWallets);
 
-    const savedSelectedAddress = await loadSelectedWalletAddress();
-    const savedWallet = savedSelectedAddress
-      ? localWallets.find(w => w.address.toLowerCase() === savedSelectedAddress.toLowerCase())
-      : null;
-    selectedWallet.update(current => current || savedWallet || localWallets[0]);
+    selectedWallet.update(current => current || getDefaultWallet(localWallets));
   }
 
   try {
@@ -166,7 +165,7 @@ export async function loadWallets() {
     }
 
     if (merged.length > 0) {
-      selectedWallet.update(current => current || merged[0]);
+      selectedWallet.update(current => current || getDefaultWallet(merged));
     }
   } catch (e: any) {
     if (localWallets.length === 0) {
