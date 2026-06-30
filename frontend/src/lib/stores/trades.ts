@@ -6,10 +6,11 @@ import type { Trade } from '../types';
 
 const CACHE_KEY = (address: string) => `hl-trades-${address.toLowerCase()}`;
 const CACHE_VERSION = 1;
-const MAX_CACHED_FILLS = 5000;
+const MAX_CACHED_FILLS = 50000;
 const BACKFILL_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-const TWO_YEARS_MS = 2 * ONE_YEAR_MS;
+const THREE_YEARS_MS = 3 * ONE_YEAR_MS;
+const FIVE_YEARS_MS = 5 * ONE_YEAR_MS;
 const BACKFILL_PARALLELISM = 3;
 
 interface CacheEntry {
@@ -137,7 +138,7 @@ export async function loadTrades(address: string) {
 
 async function backfillToOneYear(generation: number) {
   if (!currentAddress) return;
-  const target = Date.now() - ONE_YEAR_MS;
+  const target = Date.now() - THREE_YEARS_MS;
   if ((oldestFetched ?? Date.now()) <= target) {
     tradesBackfilling.set(false);
     return;
@@ -194,10 +195,10 @@ async function backfillToOneYear(generation: number) {
   }
 }
 
-// Manual "Load older" — extends one year further back per click, up to 2 years
+// Manual "Load older" — extends one year further back per click, up to 5 years
 export async function loadMoreTrades() {
   if (!currentAddress || oldestFetched === null || get(tradesLoadingMore)) return;
-  const earliestAllowed = Date.now() - TWO_YEARS_MS;
+  const earliestAllowed = Date.now() - FIVE_YEARS_MS;
   if (oldestFetched <= earliestAllowed) {
     tradesHasMore.set(false);
     return;
