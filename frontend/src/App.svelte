@@ -6,7 +6,6 @@
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
-  import CopyReadiness from './lib/components/CopyReadiness.svelte';
   import WalletInsights from './lib/components/WalletInsights.svelte';
   import PositionChanges from './lib/components/PositionChanges.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
@@ -26,8 +25,7 @@
     positionsError,
     loadPositions,
     accountSummary,
-    positionChanges,
-    positionsLastUpdated
+    positionChanges
   } from './lib/stores/positions';
   import {
     trades,
@@ -228,13 +226,6 @@
 
     <div class="content" use:pullToRefresh>
       {#if activeTab === 'positions'}
-        <CopyReadiness
-          positions={$positions}
-          trades={$trades}
-          insights={$walletInsights}
-          lastUpdated={$positionsLastUpdated}
-        />
-
         <PositionChanges changes={$positionChanges} />
 
         {#if $positions.length > 0 || positionSearch}
