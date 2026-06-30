@@ -107,26 +107,6 @@
     });
   }
 
-  function exportCSV() {
-    const header = 'Date,Coin,Direction,Side,Size,Price,Value,Closed P&L,Fee';
-    const rows = fills.map(f => {
-      const date = new Date(f.timestamp).toISOString().replace('T', ' ').slice(0, 19);
-      const value = (f.size * f.price).toFixed(2);
-      const pnl = f.closedPnl != null ? f.closedPnl.toFixed(4) : '';
-      const fee = f.fee.toFixed(4);
-      return [date, f.coin, f.direction || '', f.side, f.size, f.price, value, pnl, fee]
-        .map(v => `"${v}"`)
-        .join(',');
-    });
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `fills-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 </script>
 
 <div class="fills-list">
@@ -152,22 +132,13 @@
         <button class:active={filterMode === 'profitable'} on:click={() => filterMode = 'profitable'}>Wins</button>
         <button class:active={filterMode === 'large'} on:click={() => filterMode = 'large'}>Large</button>
       </div>
-      <div class="filter-row-right">
-        <label class="coin-filter">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/>
-            <path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input bind:value={coinFilter} placeholder="Coin" autocomplete="off" spellcheck="false" />
-        </label>
-        <button class="export-btn" on:click={exportCSV} title="Export all fills as CSV" disabled={fills.length === 0}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-        </button>
-      </div>
+      <label class="coin-filter">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input bind:value={coinFilter} placeholder="Coin" autocomplete="off" spellcheck="false" />
+      </label>
     </div>
 
     {#if filteredFills.length === 0}
@@ -220,40 +191,9 @@
 
   .filters {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) 92px;
     gap: 0.5rem;
     margin-bottom: 0.75rem;
-  }
-
-  .filter-row-right {
-    display: flex;
-    gap: 0.375rem;
-    align-items: stretch;
-  }
-
-  .export-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 0.625rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    color: var(--text-tertiary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-  }
-
-  .export-btn:hover:not(:disabled) {
-    color: var(--accent);
-    border-color: var(--accent);
-    background: var(--accent-dim);
-  }
-
-  .export-btn:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
   }
 
   .filter-buttons {
