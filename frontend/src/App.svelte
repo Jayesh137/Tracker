@@ -2,12 +2,12 @@
   import { onMount } from 'svelte';
   import { fade, fly } from 'svelte/transition';
   import Header from './lib/components/Header.svelte';
+  import TabBar from './lib/components/TabBar.svelte';
   import PositionCard from './lib/components/PositionCard.svelte';
   import PositionCardSkeleton from './lib/components/PositionCardSkeleton.svelte';
   import FillsList from './lib/components/FillsList.svelte';
-  import WalletInsights from './lib/components/WalletInsights.svelte';
   import CopyReadiness from './lib/components/CopyReadiness.svelte';
-  import WalletComparison from './lib/components/WalletComparison.svelte';
+  import WalletInsights from './lib/components/WalletInsights.svelte';
   import PositionChanges from './lib/components/PositionChanges.svelte';
   import AddWallet from './lib/components/AddWallet.svelte';
   import NotificationSettings from './lib/components/NotificationSettings.svelte';
@@ -51,8 +51,8 @@
   import { connectStream, disconnectStream } from './lib/stores/liveStream';
   import { compactMode } from './lib/stores/preferences';
   import { toast } from './lib/stores/toast';
-  import type { Wallet } from './lib/types';
 
+  let activeTab: 'positions' | 'fills' = 'positions';
   let showAddWallet = false;
   let showSettings = false;
   let refreshInterval: ReturnType<typeof setInterval>;
@@ -67,11 +67,8 @@
   onMount(() => {
     loadWallets();
 
-    // Positions still poll (mark prices change continuously); fills come via SSE.
     refreshInterval = setInterval(() => {
-      if ($selectedWallet) {
-        loadPositions($selectedWallet.address);
-      }
+      if ($selectedWallet) loadPositions($selectedWallet.address);
     }, 15000);
 
     const handleVisibilityChange = () => {
@@ -81,7 +78,6 @@
         loadWalletInsights($selectedWallet.address);
         connectStream($selectedWallet.address);
       } else if (document.visibilityState === 'hidden') {
-        // Conserve battery — backend still sends push notifications
         disconnectStream();
       }
     };
@@ -107,13 +103,11 @@
   async function handleRefresh() {
     if (isRefreshing || !$selectedWallet) return;
     isRefreshing = true;
-
     await Promise.all([
       loadPositions($selectedWallet.address),
       loadTrades($selectedWallet.address),
       loadWalletInsights($selectedWallet.address)
     ]);
-
     isRefreshing = false;
   }
 
@@ -122,10 +116,6 @@
       removeWallet(address);
       toast.success(`Removed ${name}`);
     }
-  }
-
-  function handleSelectWallet(wallet: Wallet) {
-    $selectedWallet = wallet;
   }
 
   // ── Pull-to-refresh ──────────────────────────────────────────────────────────
@@ -204,8 +194,13 @@
     </div>
 
   {:else}
-    <AccountBalance account={$accountSummary} />
+    <TabBar bind:activeTab />
 
+    {#if activeTab === 'positions'}
+      <AccountBalance account={$accountSummary} />
+    {/if}
+
+    <!-- Pull-to-refresh indicator -->
     {#if isPulling || isRefreshing}
       <div
         class="ptr-indicator"
@@ -232,31 +227,15 @@
     {/if}
 
     <div class="content" use:pullToRefresh>
-      <WalletComparison
-        wallets={$wallets}
-        selectedAddress={$selectedWallet?.address ?? null}
-        on:select={(event) => handleSelectWallet(event.detail)}
-      />
+      {#if activeTab === 'positions'}
+        <CopyReadiness
+          positions={$positions}
+          trades={$trades}
+          insights={$walletInsights}
+          lastUpdated={$positionsLastUpdated}
+        />
 
-      <CopyReadiness
-        positions={$positions}
-        trades={$trades}
-        insights={$walletInsights}
-        lastUpdated={$positionsLastUpdated}
-      />
-
-      <PositionChanges changes={$positionChanges} />
-
-      <section class="dashboard-section">
-        <div class="dashboard-heading">
-          <div>
-            <span>Positions</span>
-            <h2>Open exposure</h2>
-          </div>
-          <button class="refresh-btn" on:click={handleRefresh} disabled={isRefreshing}>
-            {isRefreshing ? 'Refreshing' : 'Refresh'}
-          </button>
-        </div>
+        <PositionChanges changes={$positionChanges} />
 
         {#if $positions.length > 0 || positionSearch}
           <div class="search-bar">
@@ -288,18 +267,17 @@
             <button class="retry-btn" on:click={() => $selectedWallet && loadPositions($selectedWallet.address)}>Retry</button>
           </div>
         {:else if $positions.length === 0}
-          <div class="empty-positions compact-card">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <div class="empty-positions">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <path d="M3 9h18"/>
               <path d="M9 21V9"/>
             </svg>
-            <p>Wallet is flat</p>
-            <span>No open positions right now.</span>
+            <p>No open positions</p>
           </div>
         {:else if filteredPositions.length === 0}
-          <div class="empty-positions compact-card">
-            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <div class="empty-positions">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="11" cy="11" r="8"/>
               <path d="m21 21-4.35-4.35"/>
               <path d="M8 8l6 6"/>
@@ -315,21 +293,14 @@
             {/each}
           </div>
         {/if}
-      </section>
 
-      <WalletInsights
-        insights={$walletInsights}
-        loading={$walletInsightsLoading}
-        error={$walletInsightsError}
-      />
+        <WalletInsights
+          insights={$walletInsights}
+          loading={$walletInsightsLoading}
+          error={$walletInsightsError}
+        />
 
-      <section class="dashboard-section">
-        <div class="dashboard-heading">
-          <div>
-            <span>Fills</span>
-            <h2>Execution history</h2>
-          </div>
-        </div>
+      {:else}
         <FillsList
           fills={$trades}
           loading={$tradesLoading}
@@ -340,11 +311,12 @@
           error={$tradesError}
           onLoadMore={loadMoreTrades}
         />
-      </section>
+      {/if}
     </div>
   {/if}
 </div>
 
+<!-- Settings right drawer -->
 {#if showSettings}
   <div
     class="settings-overlay"
@@ -441,47 +413,58 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  .dashboard-section {
-    margin-bottom: 1rem;
-  }
-
-  .dashboard-heading {
+  /* ── Pull-to-refresh ── */
+  .ptr-indicator {
     display: flex;
     align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
+    justify-content: center;
+    padding-bottom: 8px;
+    overflow: hidden;
+    transition: height 0.2s ease-out;
+    flex-shrink: 0;
   }
 
-  .dashboard-heading span {
-    color: var(--text-tertiary);
-    font-size: 0.6875rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .dashboard-heading h2 {
-    margin: 0.125rem 0 0;
-    font-size: 1rem;
-    line-height: 1.2;
-  }
-
-  .refresh-btn {
-    padding: 0.4375rem 0.625rem;
+  .ptr-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
     background: var(--bg-card);
-    color: var(--text-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 700;
+    border: 1.5px solid var(--border);
+    color: var(--text-tertiary);
+    transition: border-color 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
   }
 
-  .refresh-btn:hover:not(:disabled) {
-    color: var(--text-primary);
+  .ptr-indicator.ready .ptr-icon {
     border-color: var(--accent);
+    color: var(--accent);
   }
 
+  .ptr-arrow {
+    transition: transform 0.22s ease-out;
+  }
+
+  .ptr-arrow.ready {
+    transform: rotate(180deg);
+  }
+
+  .ptr-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: ptrSpin 0.7s linear infinite;
+  }
+
+  @keyframes ptrSpin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* ── Search bar ── */
   .search-bar {
     position: relative;
     margin-bottom: 1rem;
@@ -539,6 +522,7 @@
     background: var(--border);
   }
 
+  /* ── Positions grid ── */
   .positions-grid {
     display: flex;
     flex-direction: column;
@@ -551,14 +535,8 @@
   }
 
   @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .empty-positions {
@@ -581,19 +559,6 @@
     font-size: 0.9375rem;
   }
 
-  .empty-positions span {
-    color: var(--text-tertiary);
-    font-size: 0.8125rem;
-    margin-top: 0.25rem;
-  }
-
-  .compact-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 2rem 1rem;
-  }
-
   .error-state {
     gap: 0.75rem;
   }
@@ -607,6 +572,7 @@
     font-weight: 600;
   }
 
+  /* ── Empty / onboarding state ── */
   .empty-state {
     flex: 1;
     display: flex;
@@ -658,57 +624,6 @@
 
   .primary-btn:active {
     transform: scale(0.98);
-  }
-
-  /* ── Pull-to-refresh ── */
-  .ptr-indicator {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    padding-bottom: 8px;
-    overflow: hidden;
-    transition: height 0.2s ease-out;
-    flex-shrink: 0;
-  }
-
-  .ptr-icon {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    background: var(--bg-card);
-    border: 1.5px solid var(--border);
-    color: var(--text-tertiary);
-    transition: border-color 0.15s ease, color 0.15s ease;
-    flex-shrink: 0;
-  }
-
-  .ptr-indicator.ready .ptr-icon {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .ptr-arrow {
-    transition: transform 0.22s ease-out;
-  }
-
-  .ptr-arrow.ready {
-    transform: rotate(180deg);
-  }
-
-  .ptr-spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: ptrSpin 0.7s linear infinite;
-  }
-
-  @keyframes ptrSpin {
-    to { transform: rotate(360deg); }
   }
 
   /* ── Settings overlay + drawer ── */
@@ -773,11 +688,11 @@
   }
 
   .wallet-section {
-    background: var(--bg-card);
+    background: var(--bg-elevated);
     border-radius: var(--radius-lg);
     padding: 1rem;
     margin-top: 1rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
   }
 
   .section-header {
@@ -857,14 +772,8 @@
   }
 
   @keyframes fadeSlideIn {
-    from {
-      opacity: 0;
-      transform: translateX(-8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
 
   .wallet-list li:last-child {
