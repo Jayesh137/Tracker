@@ -164,12 +164,18 @@ export interface Wallet {
   name: string;
 }
 
+export interface LastFillMarker {
+  time: number;
+  tids: number[];
+}
+
 export interface Store {
   wallets: Wallet[];
   pushSubscriptions: PushSubscription[];
   settings: {
     notificationsEnabled: boolean;
   };
+  lastFills?: Record<string, LastFillMarker>;
 }
 
 export interface IStorage {
@@ -182,4 +188,6 @@ export interface IStorage {
   addPushSubscription(subscription: PushSubscription): Promise<void>;
   removePushSubscription(endpoint: string): Promise<void>;
   getSettings(): { notificationsEnabled: boolean };
+  getLastFills(): Record<string, LastFillMarker>;
+  setLastFill(wallet: string, marker: LastFillMarker): void;
 }

@@ -3,10 +3,22 @@
   import { setupPushNotifications, unsubscribePushNotifications, isPushEnabled } from '../utils/push';
   import { soundEnabled, testSound } from '../utils/sound';
   import { compactMode, toggleCompactMode } from '../stores/preferences';
+  import { api } from '../api/client';
 
   let pushEnabled = false;
   let loading = true;
   let error = '';
+  let testStatus = '';
+
+  async function sendTestNotification() {
+    testStatus = 'Sending...';
+    try {
+      const result = await api.testNotification();
+      testStatus = `Sent to ${result.sent} device(s) — close the app to verify`;
+    } catch (e: any) {
+      testStatus = `Failed: ${e.message}`;
+    }
+  }
 
   onMount(async () => {
     pushEnabled = await isPushEnabled();
@@ -65,6 +77,13 @@
 
   {#if error}
     <p class="error">{error}</p>
+  {/if}
+
+  {#if pushEnabled}
+    <button class="secondary-btn" on:click={sendTestNotification}>Test notification</button>
+    {#if testStatus}
+      <p class="test-status">{testStatus}</p>
+    {/if}
   {/if}
 
   <div class="setting-row">
@@ -217,5 +236,11 @@
     color: var(--red);
     font-size: 0.8125rem;
     margin: -0.25rem 0 0.75rem;
+  }
+
+  .test-status {
+    color: var(--text-tertiary);
+    font-size: 0.75rem;
+    margin: -0.5rem 0 0.75rem;
   }
 </style>

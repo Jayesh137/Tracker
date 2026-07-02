@@ -9,14 +9,16 @@ export function configurePush(publicKey: string, privateKey: string, email: stri
   console.log('[Push] Configured with VAPID keys');
 }
 
+export type PushSendResult = 'ok' | 'expired' | 'failed';
+
 export async function sendPushNotification(
   subscription: StoredSubscription,
   title: string,
   body: string
-): Promise<boolean> {
+): Promise<PushSendResult> {
   if (!isConfigured) {
     console.error('[Push] Not configured - missing VAPID keys');
-    return false;
+    return 'failed';
   }
 
   const payload = JSON.stringify({
@@ -35,15 +37,16 @@ export async function sendPushNotification(
       },
       payload
     );
-    return true;
+    return 'ok';
   } catch (error: any) {
     if (error.statusCode === 410 || error.statusCode === 404) {
-      // Subscription expired or invalid
+      // Subscription expired or invalid — safe to remove
       console.log(`[Push] Subscription expired: ${subscription.endpoint}`);
-      return false;
+      return 'expired';
     }
-    console.error('[Push] Failed to send:', error.message);
-    return false;
+    // Transient failure (5xx, network, timeout) — keep the subscription
+    console.error(`[Push] Failed to send (${error.statusCode ?? 'network'}):`, error.message);
+    return 'failed';
   }
 }
 
@@ -56,8 +59,8 @@ export async function sendToAllSubscriptions(
 
   await Promise.all(
     subscriptions.map(async (sub) => {
-      const success = await sendPushNotification(sub, title, body);
-      if (!success) {
+      const result = await sendPushNotification(sub, title, body);
+      if (result === 'expired') {
         expiredEndpoints.push(sub.endpoint);
       }
     })

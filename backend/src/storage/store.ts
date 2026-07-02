@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { Store, PushSubscription, Wallet } from '../types/index.js';
+import type { Store, PushSubscription, Wallet, LastFillMarker } from '../types/index.js';
 
 const MAX_WALLETS = 10;
 
@@ -47,7 +47,8 @@ export class Storage {
       this.store = {
         wallets,
         pushSubscriptions: parsed.pushSubscriptions || [],
-        settings: { ...DEFAULT_STORE.settings, ...parsed.settings }
+        settings: { ...DEFAULT_STORE.settings, ...parsed.settings },
+        lastFills: parsed.lastFills || {}
       };
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -96,6 +97,7 @@ export class Storage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
+    if (this.store.lastFills) delete this.store.lastFills[normalized];
     await this.save();
   }
 
@@ -133,5 +135,16 @@ export class Storage {
   // Settings
   getSettings() {
     return { ...this.store.settings };
+  }
+
+  // Last-seen fill markers (notification dedupe across restarts)
+  getLastFills(): Record<string, LastFillMarker> {
+    return { ...(this.store.lastFills || {}) };
+  }
+
+  setLastFill(wallet: string, marker: LastFillMarker): void {
+    if (!this.store.lastFills) this.store.lastFills = {};
+    this.store.lastFills[wallet.toLowerCase()] = marker;
+    this.debouncedSave();
   }
 }

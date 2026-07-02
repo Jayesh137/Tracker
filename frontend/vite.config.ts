@@ -6,8 +6,15 @@ export default defineConfig({
   plugins: [
     svelte(),
     VitePWA({
+      // Custom SW (src/sw.ts) so we control push + notificationclick handlers
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png'],
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}']
+      },
+      includeAssets: ['icons/*.png', 'icons/*.svg'],
       manifest: {
         name: 'Tracker',
         short_name: 'Tracker',
@@ -26,27 +33,6 @@ export default defineConfig({
             src: '/icons/icon-512.png',
             sizes: '512x512',
             type: 'image/png'
-          }
-        ]
-      },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        runtimeCaching: [
-          {
-            // Our backend API - always fetch fresh, no caching
-            urlPattern: /\/api\/.*/i,
-            handler: 'NetworkOnly'
-          },
-          {
-            urlPattern: /^https:\/\/api\.hyperliquid\.xyz\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'hyperliquid-api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60
-              }
-            }
           }
         ]
       }

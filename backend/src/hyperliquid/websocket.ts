@@ -15,6 +15,9 @@ export class HyperliquidWebSocket {
   private pingInterval: NodeJS.Timeout | null = null;
   private isConnecting = false;
 
+  /** Invoked after every successful (re)connect — used for fill catch-up. */
+  onConnected: (() => void) | null = null;
+
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       if (this.isConnecting) {
@@ -33,6 +36,7 @@ export class HyperliquidWebSocket {
         this.reconnectAttempts = 0;
         this.resubscribeAll();
         this.startPing();
+        this.onConnected?.();
         resolve();
       };
 
@@ -69,6 +73,9 @@ export class HyperliquidWebSocket {
 
   private handleMessage(data: any): void {
     if (data.channel === 'userFills' && data.data?.fills) {
+      // The first message after (re)subscribing is a snapshot of historical
+      // fills — never notify for those, only for genuinely new fills.
+      if (data.data.isSnapshot) return;
       const wallet = data.data.user?.toLowerCase();
       const callback = this.subscriptions.get(wallet);
 

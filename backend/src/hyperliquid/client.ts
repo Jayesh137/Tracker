@@ -237,6 +237,25 @@ export class HyperliquidClient {
     };
   }
 
+  /** All fills for a wallet since `startTime`, both DEXes, deduped, oldest first. */
+  async getFillsSince(address: string, startTime: number): Promise<HyperliquidFill[]> {
+    const now = Date.now();
+    const results = await Promise.allSettled([
+      this.fetchFillsForWindow(address, startTime, now),
+      this.fetchFillsForWindow(address, startTime, now, 'xyz')
+    ]);
+
+    const unique = new Map<string, HyperliquidFill>();
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        for (const fill of result.value) {
+          unique.set(this.fillKey(fill), fill);
+        }
+      }
+    }
+    return Array.from(unique.values()).sort((a, b) => a.time - b.time);
+  }
+
   private async fetchRecentFills(address: string, dex?: string): Promise<HyperliquidFill[]> {
     const body: Record<string, string> = {
       type: 'userFills',

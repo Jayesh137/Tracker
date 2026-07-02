@@ -1,5 +1,5 @@
 import { Redis } from '@upstash/redis';
-import type { Store, PushSubscription, Wallet } from '../types/index.js';
+import type { Store, PushSubscription, Wallet, LastFillMarker } from '../types/index.js';
 
 const STORE_KEY = 'hl-tracker:store';
 
@@ -46,7 +46,8 @@ export class RedisStorage {
         this.store = {
           wallets,
           pushSubscriptions: data.pushSubscriptions || [],
-          settings: { ...DEFAULT_STORE.settings, ...data.settings }
+          settings: { ...DEFAULT_STORE.settings, ...data.settings },
+          lastFills: data.lastFills || {}
         };
       } else {
         // No data - start with empty store
@@ -74,6 +75,11 @@ export class RedisStorage {
     }
   }
 
+  private debouncedSave(): void {
+    if (this.saveTimeout) clearTimeout(this.saveTimeout);
+    this.saveTimeout = setTimeout(() => this.save(), 500);
+  }
+
   // Wallets
   getWallets(): Wallet[] {
     return [...this.store.wallets];
@@ -94,6 +100,7 @@ export class RedisStorage {
   async removeWallet(address: string): Promise<void> {
     const normalized = address.toLowerCase();
     this.store.wallets = this.store.wallets.filter(w => w.address !== normalized);
+    if (this.store.lastFills) delete this.store.lastFills[normalized];
     await this.save();
   }
 
@@ -131,5 +138,16 @@ export class RedisStorage {
   // Settings
   getSettings() {
     return { ...this.store.settings };
+  }
+
+  // Last-seen fill markers (notification dedupe across restarts)
+  getLastFills(): Record<string, LastFillMarker> {
+    return { ...(this.store.lastFills || {}) };
+  }
+
+  setLastFill(wallet: string, marker: LastFillMarker): void {
+    if (!this.store.lastFills) this.store.lastFills = {};
+    this.store.lastFills[wallet.toLowerCase()] = marker;
+    this.debouncedSave();
   }
 }

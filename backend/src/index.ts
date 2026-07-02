@@ -9,7 +9,8 @@ import { RedisStorage } from './storage/redis-store.js';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { configurePush, sendToAllSubscriptions } from './notifications/push.js';
-import { formatTradeNotification } from './notifications/formatter.js';
+import { formatTradeNotification, shortenAddress } from './notifications/formatter.js';
+import { FillTracker } from './notifications/fill-tracker.js';
 import { createRoutes } from './routes.js';
 import { broadcastFill, broadcastWalletEvent } from './sse.js';
 import type { HyperliquidFill, IStorage } from './types/index.js';
@@ -18,7 +19,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+// Cap individual notifications per catch-up burst; older ones get one summary.
+const MAX_CATCHUP_NOTIFICATIONS = 10;
 
 function getStorePath(): string {
   if (process.env.STORE_PATH) return process.env.STORE_PATH;
@@ -60,23 +62,71 @@ async function main() {
     console.warn('[Push] VAPID keys not configured - push notifications disabled');
   }
 
-  // Handle incoming fills (trades)
-  const handleFill = async (fill: HyperliquidFill, wallet: string) => {
-    console.log(`[Fill] ${wallet} traded ${fill.sz} ${fill.coin} @ ${fill.px}`);
+  // Dedupe fills across snapshots, reconnects, and restarts
+  const fillTracker = new FillTracker((wallet, marker) => storage.setLastFill(wallet, marker));
+  fillTracker.load(storage.getLastFills());
+  // Establish a baseline for wallets we haven't seen fills for yet, so
+  // catch-up never replays history from before the tracker existed.
+  for (const wallet of storage.getWallets()) {
+    fillTracker.initialize(wallet.address, Date.now());
+  }
 
-    // Broadcast to any SSE clients (open frontend) for instant UI update
-    broadcastFill(fill, wallet, hlClient.transformFill(fill));
-
-    const { title, body } = formatTradeNotification(fill, wallet);
+  const pushToAll = async (title: string, body: string) => {
     const subscriptions = storage.getPushSubscriptions();
+    if (subscriptions.length === 0) return;
+    const expired = await sendToAllSubscriptions(subscriptions, title, body);
+    for (const endpoint of expired) {
+      await storage.removePushSubscription(endpoint);
+    }
+  };
 
-    if (subscriptions.length > 0) {
-      const expired = await sendToAllSubscriptions(subscriptions, title, body);
+  // Broadcast + notify a single (already-deduped) fill
+  const notifyFill = async (fill: HyperliquidFill, wallet: string) => {
+    console.log(`[Fill] ${wallet} traded ${fill.sz} ${fill.coin} @ ${fill.px}`);
+    broadcastFill(fill, wallet, hlClient.transformFill(fill));
+    const { title, body } = formatTradeNotification(fill, wallet);
+    await pushToAll(title, body);
+  };
 
-      // Remove expired subscriptions
-      for (const endpoint of expired) {
-        await storage.removePushSubscription(endpoint);
+  // Handle incoming live fills (trades)
+  const handleFill = async (fill: HyperliquidFill, wallet: string) => {
+    if (!fillTracker.accept(wallet, fill)) return;
+    await notifyFill(fill, wallet);
+  };
+
+  // After downtime (Render free-tier sleep, WS drop), fetch fills we missed
+  // and notify only the genuinely new ones.
+  const catchUpWallet = async (address: string) => {
+    const marker = fillTracker.getMarker(address);
+    if (!marker) {
+      fillTracker.initialize(address, Date.now());
+      return;
+    }
+    try {
+      const fills = await hlClient.getFillsSince(address, marker.time);
+      const fresh = fills.filter(fill => fillTracker.accept(address, fill));
+      if (fresh.length === 0) return;
+
+      console.log(`[CatchUp] ${address}: ${fresh.length} missed fill(s)`);
+      const toNotify = fresh.slice(-MAX_CATCHUP_NOTIFICATIONS);
+      const skipped = fresh.length - toNotify.length;
+      for (const fill of toNotify) {
+        await notifyFill(fill, address);
       }
+      if (skipped > 0) {
+        await pushToAll(
+          `⚪ ${shortenAddress(address)} traded while offline`,
+          `${skipped} earlier fill(s) not shown — open the app for full history`
+        );
+      }
+    } catch (error) {
+      console.error(`[CatchUp] Failed for ${address}:`, error);
+    }
+  };
+
+  const catchUpAllWallets = () => {
+    for (const wallet of storage.getWallets()) {
+      void catchUpWallet(wallet.address);
     }
   };
 
@@ -86,12 +136,18 @@ async function main() {
 
   // Subscribe to existing wallets
   const subscribeToWallet = (address: string) => {
+    fillTracker.initialize(address, Date.now());
     hlWebSocket.subscribeToWallet(address, handleFill, handleWalletEvent);
   };
 
   const unsubscribeFromWallet = (address: string) => {
     hlWebSocket.unsubscribeFromWallet(address);
+    fillTracker.forget(address);
   };
+
+  // Every (re)connect runs a catch-up pass — this covers both server boot
+  // (Render wake) and WS drops while the process stayed alive.
+  hlWebSocket.onConnected = catchUpAllWallets;
 
   // Create Express app
   const app = express();
@@ -121,6 +177,17 @@ async function main() {
     }
   });
 
+  // Manual end-to-end push test (close the app first to verify closed-app delivery)
+  app.post('/api/test-notification', async (req, res) => {
+    const count = storage.getPushSubscriptions().length;
+    if (count === 0) {
+      res.status(400).json({ error: 'No push subscriptions registered' });
+      return;
+    }
+    await pushToAll('🔔 Test notification', `Push pipeline is working (${new Date().toLocaleTimeString('en-GB')})`);
+    res.json({ success: true, sent: count });
+  });
+
   // Serve static frontend in production
   const frontendPath = path.join(__dirname, '../../frontend/dist');
   app.use(express.static(frontendPath));
@@ -143,20 +210,15 @@ async function main() {
     console.error('[WebSocket] Initial connection failed, will retry...');
   }
 
-  // Keep-alive ping (prevents Render free tier from sleeping)
-  const keepAliveInterval = setInterval(() => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-    fetch(`http://localhost:${PORT}/api/health`, { signal: controller.signal })
-      .catch(() => {})
-      .finally(() => clearTimeout(timeout));
-  }, KEEP_ALIVE_INTERVAL_MS);
+  // NOTE: no self keep-alive — a localhost ping never reaches Render's edge,
+  // so it cannot prevent free-tier sleep. Use a free external pinger
+  // (e.g. UptimeRobot hitting /api/health) — see README. Missed fills during
+  // sleep are recovered by the catch-up pass on reconnect.
 
   // Graceful shutdown
   process.on('SIGTERM', () => {
     console.log('[Server] SIGTERM received, shutting down gracefully...');
     hlWebSocket.close();
-    clearInterval(keepAliveInterval);
     server.close(() => {
       console.log('[Server] Closed');
       process.exit(0);

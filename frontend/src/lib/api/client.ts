@@ -67,6 +67,11 @@ export const api = {
       body: JSON.stringify(subscription)
     }),
 
+  testNotification: () =>
+    fetchJson<{ success: boolean; sent: number }>('/test-notification', {
+      method: 'POST'
+    }),
+
   unsubscribePush: (endpoint: string) =>
     fetchJson<{ success: boolean }>('/subscribe', {
       method: 'DELETE',
