@@ -109,10 +109,11 @@
     isRefreshing = false;
   }
 
-  function handleRemoveWallet(address: string, name: string) {
+  async function handleRemoveWallet(address: string, name: string) {
     if (confirm(`Remove wallet "${name}"?`)) {
-      removeWallet(address);
-      toast.success(`Removed ${name}`);
+      const ok = await removeWallet(address);
+      if (ok) toast.success(`Removed ${name}`);
+      else toast.error(`Could not remove ${name}`);
     }
   }
 

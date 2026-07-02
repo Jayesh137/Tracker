@@ -12,6 +12,8 @@ export const positionsLastUpdated = writable<number | null>(null);
 
 let consecutiveFailures = 0;
 let previousByAddress = new Map<string, Position[]>();
+let currentAddress: string | null = null;
+let generation = 0;
 
 function notional(position: Position): number {
   return position.size * position.currentPrice;
@@ -54,12 +56,20 @@ function summarizeChanges(previous: Position[], next: Position[]): string[] {
 }
 
 export async function loadPositions(address: string) {
+  const normalized = address.toLowerCase();
+  // Discard responses that arrive after the user switched wallets
+  if (normalized !== currentAddress) {
+    currentAddress = normalized;
+    generation++;
+  }
+  const thisGeneration = generation;
+
   positionsLoading.set(true);
   positionsError.set(null);
 
   try {
     const data = await api.getPositions(address);
-    const normalized = address.toLowerCase();
+    if (thisGeneration !== generation) return;
     const previous = previousByAddress.get(normalized) || [];
     positionChanges.set(previous.length > 0 ? summarizeChanges(previous, data.positions) : []);
     previousByAddress.set(normalized, data.positions);
@@ -68,6 +78,7 @@ export async function loadPositions(address: string) {
     positionsLastUpdated.set(Date.now());
     consecutiveFailures = 0;
   } catch (e: any) {
+    if (thisGeneration !== generation) return;
     positionsError.set(e.message);
     consecutiveFailures++;
     // Only surface a toast on the first transient failure or a sustained outage
@@ -78,6 +89,6 @@ export async function loadPositions(address: string) {
       }
     }
   } finally {
-    positionsLoading.set(false);
+    if (thisGeneration === generation) positionsLoading.set(false);
   }
 }
