@@ -1,12 +1,30 @@
 import type { HealthResponse, PositionsResponse, Wallet, TradesResponse, WalletInsightsResponse } from '../types';
 
 const API_BASE = '/api';
+const TOKEN_KEY = 'hl-tracker-api-token';
+
+export function getApiToken(): string {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setApiToken(token: string): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {}
+}
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = getApiToken();
   const response = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { 'X-API-Token': token } : {}),
       ...options?.headers
     }
   });

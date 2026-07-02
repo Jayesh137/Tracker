@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { getApiToken } from '../api/client';
 import { ingestLiveTrade } from './trades';
 import { loadPositions } from './positions';
 import { loadWalletInsights } from './walletInsights';
@@ -32,7 +33,10 @@ export function connectStream(address: string) {
   currentAddress = address.toLowerCase();
 
   try {
-    eventSource = new EventSource(`/api/stream?address=${encodeURIComponent(currentAddress)}`);
+    // EventSource can't set headers, so the token rides as a query param
+    const token = getApiToken();
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : '';
+    eventSource = new EventSource(`/api/stream?address=${encodeURIComponent(currentAddress)}${tokenParam}`);
   } catch {
     scheduleReconnect();
     return;

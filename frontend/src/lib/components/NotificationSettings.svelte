@@ -3,7 +3,13 @@
   import { setupPushNotifications, unsubscribePushNotifications, isPushEnabled } from '../utils/push';
   import { soundEnabled, testSound } from '../utils/sound';
   import { compactMode, toggleCompactMode } from '../stores/preferences';
-  import { api } from '../api/client';
+  import { api, getApiToken, setApiToken } from '../api/client';
+
+  let apiToken = getApiToken();
+
+  function saveApiToken() {
+    setApiToken(apiToken.trim());
+  }
 
   let pushEnabled = false;
   let loading = true;
@@ -105,6 +111,21 @@
   {#if $soundEnabled}
     <button class="secondary-btn" on:click={testSound}>Test sound</button>
   {/if}
+
+  <div class="setting-row token-row">
+    <div>
+      <strong>API token</strong>
+      <span>Matches the server's API_TOKEN env var.</span>
+      <input
+        type="password"
+        class="token-input"
+        bind:value={apiToken}
+        on:blur={saveApiToken}
+        placeholder="Not set"
+        autocomplete="off"
+      />
+    </div>
+  </div>
 
   <div class="setting-row">
     <div>
@@ -236,6 +257,26 @@
     color: var(--red);
     font-size: 0.8125rem;
     margin: -0.25rem 0 0.75rem;
+  }
+
+  .token-row div {
+    flex: 1;
+  }
+
+  .token-input {
+    margin-top: 0.375rem;
+    width: 100%;
+    padding: 0.5rem 0.625rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+  }
+
+  .token-input:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   .test-status {

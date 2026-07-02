@@ -1,8 +1,51 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { HyperliquidClient } from './hyperliquid/client.js';
 import { HyperliquidWebSocket } from './hyperliquid/websocket.js';
 import { addSSEClient, getSSEClientCount, removeSSEClient } from './sse.js';
 import type { PushSubscription, IStorage } from './types/index.js';
+
+const ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
+const MAX_PUSH_SUBSCRIPTIONS = 5;
+
+// Static-token gate for mutating/streaming routes. Header for fetch,
+// query param for EventSource (which cannot set headers).
+// If API_TOKEN is unset the gate is open (local dev); production should set it.
+export function requireToken(req: Request, res: Response, next: NextFunction): void {
+  const token = process.env.API_TOKEN;
+  if (!token) {
+    next();
+    return;
+  }
+  const provided = req.header('x-api-token')
+    || (typeof req.query.token === 'string' ? req.query.token : '');
+  if (provided === token) {
+    next();
+    return;
+  }
+  res.status(401).json({ error: 'Invalid or missing API token' });
+}
+
+// Cheap in-memory per-IP rate limit (single instance, resets each minute)
+const requestCounts = new Map<string, { count: number; windowStart: number }>();
+const RATE_LIMIT_PER_MINUTE = 300;
+
+export function rateLimit(req: Request, res: Response, next: NextFunction): void {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const entry = requestCounts.get(ip);
+  if (!entry || now - entry.windowStart > 60_000) {
+    if (requestCounts.size > 1000) requestCounts.clear();
+    requestCounts.set(ip, { count: 1, windowStart: now });
+    next();
+    return;
+  }
+  entry.count++;
+  if (entry.count > RATE_LIMIT_PER_MINUTE) {
+    res.status(429).json({ error: 'Too many requests' });
+    return;
+  }
+  next();
+}
 
 export function createRoutes(
   storage: IStorage,
@@ -32,7 +75,7 @@ export function createRoutes(
   });
 
   // Add wallet
-  router.post('/wallets', async (req: Request, res: Response) => {
+  router.post('/wallets', requireToken, async (req: Request, res: Response) => {
     const { address, name } = req.body;
 
     if (!address || typeof address !== 'string') {
@@ -41,7 +84,7 @@ export function createRoutes(
     }
 
     // Validate Ethereum address format
-    if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    if (!ADDRESS_RE.test(address)) {
       res.status(400).json({ error: 'Invalid Ethereum address format' });
       return;
     }
@@ -52,7 +95,7 @@ export function createRoutes(
       return;
     }
 
-    const walletName = typeof name === 'string' ? name : '';
+    const walletName = typeof name === 'string' ? name.slice(0, 100) : '';
     await storage.addWallet(address, walletName);
     onWalletAdded(address);
 
@@ -60,12 +103,16 @@ export function createRoutes(
   });
 
   // Update wallet name
-  router.patch('/wallets/:address', async (req: Request, res: Response) => {
+  router.patch('/wallets/:address', requireToken, async (req: Request, res: Response) => {
     const { address } = req.params;
     const { name } = req.body;
 
-    if (typeof name !== 'string') {
-      res.status(400).json({ error: 'Name is required' });
+    if (!ADDRESS_RE.test(address)) {
+      res.status(400).json({ error: 'Invalid Ethereum address format' });
+      return;
+    }
+    if (typeof name !== 'string' || name.length > 100) {
+      res.status(400).json({ error: 'Name is required (max 100 chars)' });
       return;
     }
 
@@ -74,8 +121,13 @@ export function createRoutes(
   });
 
   // Remove wallet
-  router.delete('/wallets/:address', async (req: Request, res: Response) => {
+  router.delete('/wallets/:address', requireToken, async (req: Request, res: Response) => {
     const { address } = req.params;
+
+    if (!ADDRESS_RE.test(address)) {
+      res.status(400).json({ error: 'Invalid Ethereum address format' });
+      return;
+    }
 
     await storage.removeWallet(address);
     onWalletRemoved(address);
@@ -125,7 +177,7 @@ export function createRoutes(
   });
 
   // SSE stream of live fills (instant UI updates while app is open)
-  router.get('/stream', (req: Request, res: Response) => {
+  router.get('/stream', requireToken, (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -141,11 +193,18 @@ export function createRoutes(
   });
 
   // Subscribe to push notifications
-  router.post('/subscribe', async (req: Request, res: Response) => {
+  router.post('/subscribe', requireToken, async (req: Request, res: Response) => {
     const subscription = req.body as PushSubscription;
 
     if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
       res.status(400).json({ error: 'Invalid subscription object' });
+      return;
+    }
+
+    const existing = storage.getPushSubscriptions();
+    const alreadyKnown = existing.some(s => s.endpoint === subscription.endpoint);
+    if (!alreadyKnown && existing.length >= MAX_PUSH_SUBSCRIPTIONS) {
+      res.status(400).json({ error: `Maximum of ${MAX_PUSH_SUBSCRIPTIONS} push subscriptions allowed` });
       return;
     }
 
@@ -154,7 +213,7 @@ export function createRoutes(
   });
 
   // Unsubscribe from push notifications
-  router.delete('/subscribe', async (req: Request, res: Response) => {
+  router.delete('/subscribe', requireToken, async (req: Request, res: Response) => {
     const { endpoint } = req.body;
 
     if (!endpoint) {
