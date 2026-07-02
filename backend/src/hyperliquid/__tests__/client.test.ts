@@ -21,7 +21,7 @@ describe('HyperliquidClient', () => {
   });
 
   describe('getPositions', () => {
-    it('should fetch and transform positions for a wallet', async () => {
+    it('includes spot balances in account value and uses withdrawable for available', async () => {
       vi.spyOn(globalThis, 'fetch')
         .mockResolvedValueOnce(jsonResponse({
           assetPositions: [{
@@ -44,7 +44,8 @@ describe('HyperliquidClient', () => {
             totalMarginUsed: '342.15',
             totalNtlPos: '8553.75',
             totalRawUsd: '9657.85'
-          }
+          },
+          withdrawable: '9657.85'
         }))
         .mockResolvedValueOnce(jsonResponse({
           assetPositions: [],
@@ -53,10 +54,29 @@ describe('HyperliquidClient', () => {
             totalMarginUsed: '0',
             totalNtlPos: '0',
             totalRawUsd: '0'
-          }
+          },
+          withdrawable: '0'
         }))
         .mockResolvedValueOnce(jsonResponse({ ETH: '3500' }))
-        .mockResolvedValueOnce(jsonResponse({}));
+        .mockResolvedValueOnce(jsonResponse({}))
+        // spotClearinghouseState: 5000 USDC + 100 HYPE
+        .mockResolvedValueOnce(jsonResponse({
+          balances: [
+            { coin: 'USDC', token: 0, total: '5000', hold: '0', entryNtl: '0' },
+            { coin: 'HYPE', token: 150, total: '100', hold: '0', entryNtl: '0' }
+          ]
+        }))
+        // spotMetaAndAssetCtxs: HYPE/USDC pair mid = 40
+        .mockResolvedValueOnce(jsonResponse([
+          {
+            tokens: [
+              { name: 'USDC', index: 0 },
+              { name: 'HYPE', index: 150 }
+            ],
+            universe: [{ name: '@107', tokens: [150, 0], index: 0 }]
+          },
+          [{ midPx: '40' }]
+        ]));
 
       const result = await client.getPositions(TEST_WALLET);
 
@@ -67,7 +87,33 @@ describe('HyperliquidClient', () => {
         currentPrice: 3500,
         side: 'long'
       });
+      // perps 10000 + spot USDC 5000 + 100 HYPE @ 40 = 19000
+      expect(result.account.accountValue).toBe(19000);
+      // withdrawable 9657.85 + spot USDC 5000 (never negative like value - margin)
+      expect(result.account.availableBalance).toBe(14657.85);
+      expect(result.account.totalMarginUsed).toBe(342.15);
+    });
+
+    it('falls back to perp-only account value when spot endpoints fail', async () => {
+      vi.spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(jsonResponse({
+          assetPositions: [],
+          marginSummary: { accountValue: '10000', totalMarginUsed: '0', totalNtlPos: '0', totalRawUsd: '0' },
+          withdrawable: '10000'
+        }))
+        .mockResolvedValueOnce(jsonResponse({
+          assetPositions: [],
+          marginSummary: { accountValue: '0', totalMarginUsed: '0', totalNtlPos: '0', totalRawUsd: '0' },
+          withdrawable: '0'
+        }))
+        .mockResolvedValueOnce(jsonResponse({}))
+        .mockResolvedValueOnce(jsonResponse({}))
+        .mockRejectedValueOnce(new Error('spot down'))
+        .mockRejectedValueOnce(new Error('spot down'));
+
+      const result = await client.getPositions(TEST_WALLET);
       expect(result.account.accountValue).toBe(10000);
+      expect(result.account.availableBalance).toBe(10000);
     });
   });
 

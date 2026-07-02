@@ -68,6 +68,28 @@ export interface HyperliquidClearinghouseState {
     totalNtlPos: string;
     totalRawUsd: string;
   };
+  withdrawable?: string;
+}
+
+export interface HyperliquidSpotBalance {
+  coin: string;
+  token: number;
+  total: string;
+  hold: string;
+  entryNtl: string;
+}
+
+export interface HyperliquidSpotState {
+  balances: HyperliquidSpotBalance[];
+}
+
+export interface HyperliquidSpotMeta {
+  tokens: Array<{ name: string; index: number }>;
+  universe: Array<{ name: string; tokens: [number, number]; index: number }>;
+}
+
+export interface HyperliquidSpotAssetCtx {
+  midPx?: string | null;
 }
 
 // App types

@@ -4,6 +4,9 @@ import type {
   HyperliquidFunding,
   HyperliquidOpenOrder,
   HyperliquidPosition,
+  HyperliquidSpotAssetCtx,
+  HyperliquidSpotMeta,
+  HyperliquidSpotState,
   HyperliquidTwapSliceFill,
   FundingInsight,
   OpenOrderIntent,
@@ -53,8 +56,8 @@ export class HyperliquidClient {
   }
 
   async getPositions(address: string): Promise<PositionsResponse> {
-    // Fetch positions and current prices in parallel (both default and xyz DEX)
-    const [defaultResponse, xyzResponse, defaultMidsResult, xyzMidsResult] = await Promise.all([
+    // Fetch positions, prices (both default and xyz DEX), and spot balances in parallel
+    const [defaultResponse, xyzResponse, defaultMidsResult, xyzMidsResult, spotState, spotMetaCtxs] = await Promise.all([
       this.fetchWithTimeout(`${API_URL}/info`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -73,7 +76,9 @@ export class HyperliquidClient {
         })
       }).catch(() => null),
       this.getAllMids().catch(() => ({})),
-      this.getAllMids('xyz').catch(() => ({}))
+      this.getAllMids('xyz').catch(() => ({})),
+      this.postInfo<HyperliquidSpotState>({ type: 'spotClearinghouseState', user: address }).catch(() => null),
+      this.postInfo<[HyperliquidSpotMeta, HyperliquidSpotAssetCtx[]]>({ type: 'spotMetaAndAssetCtxs' }).catch(() => null)
     ]);
 
     // Merge mids from both DEXes
@@ -88,14 +93,11 @@ export class HyperliquidClient {
       .filter(ap => parseFloat(ap.position.szi) !== 0)
       .map(ap => this.transformPosition(ap.position, mids[ap.position.coin]));
 
-    // Extract account summary from default perp DEX
-    const accountValue = parseFloat(defaultData.marginSummary.accountValue);
-    const totalMarginUsed = parseFloat(defaultData.marginSummary.totalMarginUsed);
-    const account: AccountSummary = {
-      accountValue,
-      totalMarginUsed,
-      availableBalance: accountValue - totalMarginUsed
-    };
+    // Perp account across both DEXes. "Available" uses the API's withdrawable
+    // (accountValue - marginUsed goes negative on leveraged cross positions).
+    let perpValue = parseFloat(defaultData.marginSummary.accountValue) || 0;
+    let totalMarginUsed = parseFloat(defaultData.marginSummary.totalMarginUsed) || 0;
+    let withdrawable = parseFloat(defaultData.withdrawable ?? '') || 0;
 
     // xyz DEX might not exist for all wallets, so handle gracefully
     let xyzPositions: Position[] = [];
@@ -106,18 +108,63 @@ export class HyperliquidClient {
           .filter(ap => parseFloat(ap.position.szi) !== 0)
           .map(ap => this.transformPosition(ap.position, mids[ap.position.coin]));
       }
-      // Add xyz account value to total
       if (xyzData.marginSummary) {
-        account.accountValue += parseFloat(xyzData.marginSummary.accountValue);
-        account.totalMarginUsed += parseFloat(xyzData.marginSummary.totalMarginUsed);
-        account.availableBalance = account.accountValue - account.totalMarginUsed;
+        perpValue += parseFloat(xyzData.marginSummary.accountValue) || 0;
+        totalMarginUsed += parseFloat(xyzData.marginSummary.totalMarginUsed) || 0;
+        withdrawable += parseFloat(xyzData.withdrawable ?? '') || 0;
       }
     }
+
+    // Spot holdings count toward account value (Hyperliquid UI includes them);
+    // spot USDC also counts as deployable balance.
+    const { spotValue, spotUsdc } = this.computeSpotValue(spotState, spotMetaCtxs);
+
+    const account: AccountSummary = {
+      accountValue: perpValue + spotValue,
+      totalMarginUsed,
+      availableBalance: withdrawable + spotUsdc
+    };
 
     return {
       positions: [...defaultPositions, ...xyzPositions],
       account
     };
+  }
+
+  /** Values spot balances in USDC using mid prices of USDC-quoted pairs. */
+  private computeSpotValue(
+    state: HyperliquidSpotState | null,
+    metaCtxs: [HyperliquidSpotMeta, HyperliquidSpotAssetCtx[]] | null
+  ): { spotValue: number; spotUsdc: number } {
+    if (!state?.balances?.length) return { spotValue: 0, spotUsdc: 0 };
+
+    const prices = new Map<string, number>();
+    if (metaCtxs) {
+      const [meta, ctxs] = metaCtxs;
+      const tokenNames = new Map(meta.tokens.map(t => [t.index, t.name]));
+      meta.universe.forEach((pair, i) => {
+        const mid = parseFloat(ctxs[i]?.midPx || '') || 0;
+        if (!mid) return;
+        const [baseToken, quoteToken] = pair.tokens;
+        if (quoteToken !== 0) return; // only USDC-quoted pairs
+        const name = tokenNames.get(baseToken);
+        if (name && !prices.has(name)) prices.set(name, mid);
+      });
+    }
+
+    let spotValue = 0;
+    let spotUsdc = 0;
+    for (const balance of state.balances) {
+      const amount = parseFloat(balance.total) || 0;
+      if (amount === 0) continue;
+      if (balance.coin === 'USDC') {
+        spotValue += amount;
+        spotUsdc += amount;
+      } else {
+        spotValue += amount * (prices.get(balance.coin) ?? 0);
+      }
+    }
+    return { spotValue, spotUsdc };
   }
 
   async getTrades(address: string, startTime?: number, endTime?: number): Promise<TradesResponse> {
