@@ -15,6 +15,20 @@
   let filterMode: FilterMode = 'all';
   let coinFilter = '';
 
+  // Debounce coin typing — filtering/grouping runs over the full history
+  let coinFilterInput = '';
+  let coinFilterTimeout: ReturnType<typeof setTimeout>;
+  $: {
+    clearTimeout(coinFilterTimeout);
+    const next = coinFilterInput;
+    coinFilterTimeout = setTimeout(() => { coinFilter = next; }, 200);
+  }
+
+  // Render a window of day sections, not years of DOM (iPhone 8)
+  const INITIAL_DAYS = 14;
+  const DAYS_INCREMENT = 30;
+  let visibleDays = INITIAL_DAYS;
+
   interface CoinGroup {
     coin: string;
     direction: string;
@@ -31,6 +45,12 @@
 
   $: filteredFills = applyFilters(fills, filterMode, coinFilter);
   $: daySections = groupByDay(filteredFills);
+  $: visibleSections = daySections.slice(0, visibleDays);
+  $: hiddenDayCount = daySections.length - visibleSections.length;
+
+  // Reset the window when the filters change
+  $: filterKey = `${filterMode}|${coinFilter}`;
+  $: if (filterKey) visibleDays = INITIAL_DAYS;
 
   function getDayLabel(timestamp: number): string {
     const date = new Date(timestamp);
@@ -137,7 +157,7 @@
           <circle cx="11" cy="11" r="8"/>
           <path d="m21 21-4.35-4.35"/>
         </svg>
-        <input bind:value={coinFilter} placeholder="Coin" autocomplete="off" spellcheck="false" />
+        <input bind:value={coinFilterInput} placeholder="Coin" autocomplete="off" spellcheck="false" />
       </label>
     </div>
 
@@ -145,7 +165,7 @@
       <p class="empty compact-empty">No fills match the current filters</p>
     {/if}
 
-    {#each daySections as section (section.dateKey)}
+    {#each visibleSections as section (section.dateKey)}
       <div class="day-section">
         <div class="day-header">
           <span class="day-label">{section.label}</span>
@@ -162,7 +182,13 @@
       </div>
     {/each}
 
-    {#if backfilling}
+    {#if hiddenDayCount > 0}
+      <div class="load-more">
+        <button class="load-more-btn" on:click={() => visibleDays += DAYS_INCREMENT}>
+          Show earlier days ({hiddenDayCount} more)
+        </button>
+      </div>
+    {:else if backfilling}
       <div class="loading-history">
         <span class="spinner"></span>
         <span>Loading older history...</span>
