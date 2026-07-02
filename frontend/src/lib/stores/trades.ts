@@ -111,7 +111,7 @@ export async function loadTrades(address: string) {
     }
 
     if (isFirstLoad) {
-      // Backfill to 1 year ago in parallel chunks
+      // Backfill history (up to 3 years) in parallel chunks
       const earliestKnown = result.trades.length > 0
         ? Math.min(...result.trades.map(t => t.timestamp))
         : Date.now();
@@ -120,7 +120,7 @@ export async function loadTrades(address: string) {
       tradesIncomplete.set(result.incomplete);
       isFirstLoad = false;
       void writeCache(address);
-      void backfillToOneYear(thisGeneration);
+      void backfillHistory(thisGeneration);
     } else if (added > 0) {
       void writeCache(address);
     }
@@ -136,7 +136,7 @@ export async function loadTrades(address: string) {
   }
 }
 
-async function backfillToOneYear(generation: number) {
+async function backfillHistory(generation: number) {
   if (!currentAddress) return;
   const target = Date.now() - THREE_YEARS_MS;
   if ((oldestFetched ?? Date.now()) <= target) {

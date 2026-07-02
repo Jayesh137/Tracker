@@ -59,63 +59,54 @@ frontend/
 ├── src/
 │   ├── lib/
 │   │   ├── components/
-│   │   │   ├── Dashboard.svelte      # Main dashboard view
-│   │   │   ├── PositionCard.svelte   # Single position display
-│   │   │   ├── TradeList.svelte      # Recent trades list
-│   │   │   ├── TradeItem.svelte      # Single trade row
-│   │   │   ├── WalletSelector.svelte # Wallet dropdown
-│   │   │   ├── WalletManager.svelte  # Add/remove wallets
-│   │   │   ├── Settings.svelte       # Notification settings
-│   │   │   └── Header.svelte         # App header
+│   │   │   ├── Header.svelte               # App header + wallet dropdown
+│   │   │   ├── TabBar.svelte               # Positions / Fills tabs
+│   │   │   ├── AccountBalance.svelte       # Account value summary
+│   │   │   ├── PositionCard.svelte         # Single position display
+│   │   │   ├── PositionCardSkeleton.svelte # Loading state
+│   │   │   ├── PositionChanges.svelte      # Recent position deltas
+│   │   │   ├── FillsList.svelte            # Fills tab (filters, day sections)
+│   │   │   ├── FillGroup.svelte            # Coin/direction group of fills
+│   │   │   ├── FillRow.svelte              # Single fill row
+│   │   │   ├── WalletInsights.svelte       # Open orders / TWAP / funding
+│   │   │   ├── WalletDropdown.svelte       # Wallet switcher
+│   │   │   ├── AddWallet.svelte            # Add-wallet modal
+│   │   │   ├── NotificationSettings.svelte # Push/sound/token/compact settings
+│   │   │   └── Toast.svelte                # Toast notifications
 │   │   │
 │   │   ├── stores/
-│   │   │   ├── wallets.ts            # Wallet list state
+│   │   │   ├── wallets.ts            # Wallet list (server-authoritative, IDB cache)
 │   │   │   ├── positions.ts          # Positions state
-│   │   │   ├── trades.ts             # Recent trades state
-│   │   │   └── notifications.ts      # Push subscription state
+│   │   │   ├── trades.ts             # Fills history + 3-year backfill + IDB cache
+│   │   │   ├── walletInsights.ts     # Orders/TWAP/funding state
+│   │   │   ├── liveStream.ts         # SSE connection for live fills
+│   │   │   ├── preferences.ts        # Pinned wallets, compact mode
+│   │   │   └── toast.ts              # Toast queue
 │   │   │
 │   │   ├── api/
-│   │   │   └── client.ts             # Backend API client
+│   │   │   └── client.ts             # Backend API client (+ API token)
 │   │   │
 │   │   ├── utils/
-│   │   │   ├── format.ts             # Price/size formatting
-│   │   │   └── push.ts               # Push subscription helpers
+│   │   │   ├── push.ts               # Push subscription helpers
+│   │   │   ├── sound.ts              # Fill alert sound
+│   │   │   └── clipboard.ts          # Copy helpers
 │   │   │
 │   │   └── types/
 │   │       └── index.ts              # TypeScript interfaces
 │   │
-│   ├── App.svelte                    # Root component
+│   ├── App.svelte                    # Root component (tabs, drawer, pull-to-refresh)
+│   ├── sw.ts                         # Service worker (precache + push handlers)
 │   ├── main.ts                       # Entry point
 │   └── app.css                       # Global styles
 │
 ├── public/
-│   ├── icons/                        # PWA icons (192x192, 512x512)
-│   └── favicon.ico
+│   └── icons/                        # PWA icons (192x192, 512x512, svg)
 │
 ├── index.html
 ├── vite.config.ts
 ├── svelte.config.js
 ├── tsconfig.json
-├── package.json
-└── .env.example
-```
-
-### Component Hierarchy
-
-```
-App.svelte
-├── Header.svelte
-│   ├── WalletSelector.svelte
-│   └── Settings button
-│
-├── Dashboard.svelte (main route)
-│   ├── PositionCard.svelte (×N)
-│   └── TradeList.svelte
-│       └── TradeItem.svelte (×N)
-│
-├── WalletManager.svelte (settings route)
-│
-└── Settings.svelte (settings route)
+└── package.json
 ```
 
 ### State Management
@@ -242,7 +233,8 @@ backend/
 │  4. Create Express app, register routes                      │
 │  5. Start HTTP server                                        │
 │  6. Connect WebSockets for all tracked wallets               │
-│  7. Start keep-alive ping interval (10 min)                  │
+│  7. On every (re)connect: catch up fills missed since the    │
+│     persisted last-seen marker and notify only new ones      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -543,10 +535,9 @@ services:
 ## Performance Considerations
 
 1. **WebSocket Keep-Alive** - Ping every 30s to prevent timeout
-2. **Server Keep-Alive** - Self-ping every 10min to prevent Render sleep
+2. **External Pinger** - Free uptime monitor hits /api/health to reduce Render free-tier sleep (a localhost self-ping cannot); missed fills are caught up on reconnect
 3. **Debounced Storage Writes** - Batch writes to prevent disk thrashing
-4. **Frontend Caching** - Service worker caches static assets
-5. **API Response Caching** - Cache positions for 5s to reduce Hyperliquid calls
+4. **Frontend Caching** - Service worker caches static assets; fills cached in IndexedDB
 
 ---
 
@@ -555,7 +546,8 @@ services:
 ### Backend
 - WebSocket disconnect → Exponential backoff reconnect
 - Hyperliquid API error → Retry with backoff, log error
-- Push notification fail → Remove invalid subscriptions
+- Push notification fail → Remove subscription only on 404/410 (expired); transient failures keep it
+- Snapshot/replayed fills → Deduplicated via persisted per-wallet last-seen marker
 - Storage write fail → Log error, keep in-memory state
 
 ### Frontend

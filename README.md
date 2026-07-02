@@ -5,11 +5,12 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
 ## Features
 
 - Real-time trade alerts via WebSocket
-- Push notifications (works when app is closed)
-- Live cockpit showing positions, copy-readiness, intent signals, and fills
-- Wallet comparison for tracked traders
-- Open order, TWAP, funding, and dedupe insight signals
+- Push notifications (work when the app is closed; deduplicated across restarts/reconnects)
+- Catch-up notifications for fills missed while the server slept
+- Live positions and full fills history (backfilled up to 3 years, cached on-device)
+- Open order, TWAP, and funding insight signals
 - Track up to 10 wallets
+- Static API token protecting mutating endpoints
 
 ## Local Development
 
@@ -62,6 +63,7 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
    - `VAPID_PUBLIC_KEY`
    - `VAPID_PRIVATE_KEY`
    - `VAPID_EMAIL` (mailto:your@email.com)
+   - `API_TOKEN` (generate with `openssl rand -hex 24`; enter the same value in the app's Settings → API token)
    - `FRONTEND_URL` (your static site URL)
    - `UPSTASH_REDIS_REST_URL`
    - `UPSTASH_REDIS_REST_TOKEN`
@@ -69,6 +71,20 @@ A PWA that tracks Hyperliquid DEX wallets in real-time and sends push notificati
    Redis is recommended for production persistence. Without Redis, the backend falls back to file storage. In production file storage uses `/data/store.json`, which requires a persistent disk to survive restarts.
 
 5. Deploy
+
+### Keeping the free tier awake (£0)
+
+Render's free tier sleeps after ~15 minutes without inbound traffic; while asleep the
+WebSocket is down and trades are only recovered (and notified) when the service wakes.
+Set up a free external pinger — e.g. [UptimeRobot](https://uptimerobot.com) or
+[cron-job.org](https://cron-job.org) — hitting `https://<your-app>/api/health` every
+5–10 minutes. Missed fills during any remaining downtime are caught up automatically
+on reconnect (up to 10 individual notifications plus a summary).
+
+### Verifying push works
+
+In the app: Settings → enable Push notifications → tap **Test notification**, then
+close the app fully. The notification should arrive on the lock screen.
 
 ## iPhone Setup
 

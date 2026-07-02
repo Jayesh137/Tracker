@@ -87,11 +87,10 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
   - Action (open/close/reduce)
   - Coin, side, size, price
   - PnL for closes
-- Wallet selector and comparison strip (when tracking multiple)
-- Copy-readiness summary that turns positions, fills, orders, and TWAPs into an actionable status
-- Intent signals for open orders, TWAP slices, funding cost, and data dedupe state
+- Wallet dropdown (when tracking multiple)
+- Intent signals for open orders, TWAP slices, and funding cost
 - Pull-to-refresh
-- Auto-refresh every 30 seconds
+- Auto-refresh every 15 seconds
 
 ### 4. Wallet Management
 
@@ -147,7 +146,7 @@ Single user (the developer) who wants to follow 1-3 successful Hyperliquid trade
 | DELETE | `/api/subscribe` | Unregister push subscription |
 | GET | `/api/health` | Health check (for keep-alive) |
 
-**Keep-Alive:** Self-ping every 10 minutes to prevent Render free tier sleep.
+**Keep-Alive:** Free external pinger (e.g. UptimeRobot) hits `/api/health`; missed fills during sleep are caught up and notified on reconnect using a persisted per-wallet last-seen marker.
 
 ### Frontend
 
